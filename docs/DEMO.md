@@ -13,7 +13,7 @@ npm run verify
 For a deployed app:
 
 ```powershell
-$env:STREAM_CHAT_BASE_URL = "https://your-live-url.example"
+$env:STREAM_CHAT_BASE_URL = "https://unified-stream-chat.vercel.app"
 npm run smoke:live
 ```
 

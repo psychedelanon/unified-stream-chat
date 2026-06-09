@@ -57,6 +57,12 @@ $env:STREAM_CHAT_BASE_URL = "https://your-live-app.example"
 npm run smoke:live
 ```
 
+Current live demo:
+
+```text
+https://unified-stream-chat.vercel.app
+```
+
 Seed a deployed app before recording:
 
 ```powershell

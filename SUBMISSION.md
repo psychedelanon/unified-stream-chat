@@ -3,7 +3,7 @@
 ## Form Fields
 
 - X Handle: `bitcoinaqua`
-- Live app: deploy the standalone app and submit the dashboard URL.
+- Live app: `https://unified-stream-chat.vercel.app`
 - GitHub repo: `https://github.com/psychedelanon/unified-stream-chat`
 
 ## Demo Flow
