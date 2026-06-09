@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/overlay",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/health",
+      "destination": "/api/stream?path=health"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "/api/stream?path=:path*"
+    }
+  ]
+}

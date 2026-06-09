@@ -6,7 +6,7 @@ import { loadEnv } from "../src/env.mjs";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 loadEnv(root);
 
-const baseUrl = process.env.STREAM_CHAT_BASE_URL || "http://127.0.0.1:8787";
+const baseUrl = process.argv[2] || process.env.STREAM_CHAT_BASE_URL || "http://127.0.0.1:8787";
 const now = Date.now();
 
 const messages = [

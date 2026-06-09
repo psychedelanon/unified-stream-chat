@@ -143,6 +143,12 @@ $env:STREAM_CHAT_BASE_URL = "https://your-live-app.example"
 npm run smoke:live
 ```
 
+Seed a deployed demo directly:
+
+```powershell
+node scripts\seed-demo.mjs https://your-live-app.example
+```
+
 ## Deployment
 
 See [docs/DEPLOY.md](docs/DEPLOY.md). The repo includes:
@@ -151,6 +157,7 @@ See [docs/DEPLOY.md](docs/DEPLOY.md). The repo includes:
 - `docker-compose.yml`
 - `render.yaml`
 - `Procfile`
+- `vercel.json` and `api/stream.js` for demo/preview deployments
 - Local verification scripts: `npm run check`, `npm run doctor`, `npm run verify`, and `npm run smoke:live`
 
 ## Contest Demo

@@ -24,6 +24,15 @@ After pushing, open the repo in an incognito/private browser and confirm it is p
 
 Fastest production-friendly path: Render Blueprint using `render.yaml`.
 
+Fastest preview/demo path from this machine: Vercel.
+
+```powershell
+cd C:\Users\mgmay\Code\unified-stream-chat
+vercel deploy . -y
+```
+
+The Vercel adapter serves `/api/*`, `/health`, `/`, and `/overlay`. Add Upstash Redis REST env vars if you need durable state across serverless cold starts.
+
 Required env:
 
 ```text
@@ -46,6 +55,12 @@ Smoke-test the deployed app:
 ```powershell
 $env:STREAM_CHAT_BASE_URL = "https://your-live-app.example"
 npm run smoke:live
+```
+
+Seed a deployed app before recording:
+
+```powershell
+node scripts\seed-demo.mjs https://your-live-app.example
 ```
 
 To smoke-test source labels with a protected deployment:

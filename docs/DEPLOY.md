@@ -2,6 +2,8 @@
 
 Unified Stream Chat is a long-running Node service. Prefer Docker, Render, Railway, Fly.io, or a VPS over serverless function hosts because the app uses server-sent events for low-latency dashboard and OBS updates.
 
+Vercel is supported for demos and preview deployments through `api/stream.js` and `vercel.json`. On Vercel, `/api/events` returns the current state as a short server-sent event response and the browser's polling fallback keeps the dashboard and overlays fresh.
+
 ## Render
 
 This repo includes `render.yaml`.
@@ -26,6 +28,21 @@ This repo includes `render.yaml`.
 npm run setup
 docker compose up -d --build
 ```
+
+## Vercel Preview
+
+```bash
+vercel deploy . -y
+```
+
+Set these environment variables in the Vercel project when exposing the dashboard publicly:
+
+```text
+PUBLIC_BASE_URL=https://your-deployment.vercel.app
+STREAM_CHAT_ADMIN_TOKEN=<long-random-token>
+```
+
+For durable state on Vercel, add Upstash Redis REST variables. Without them, messages live in warm serverless memory, which is fine for a recorded contest demo but not the best production posture.
 
 ## VPS
 

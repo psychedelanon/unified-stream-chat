@@ -8,3 +8,5 @@ Thumbs.db
 .local/
 coverage/
 dist/
+
+.vercel
