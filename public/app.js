@@ -1,0 +1,592 @@
+const params = new URLSearchParams(window.location.search);
+const isOverlay = location.pathname.includes("/overlay") || params.get("overlay") === "1";
+const app = document.getElementById("app");
+const localMessageKey = "unifiedStreamChat.messages";
+const overlayOptions = readOverlayOptions();
+
+document.body.classList.toggle("is-overlay", isOverlay);
+document.body.dataset.overlayLayout = overlayOptions.layout;
+document.body.dataset.overlayPosition = overlayOptions.position;
+app.dataset.mode = isOverlay ? "overlay" : "dashboard";
+app.dataset.overlayLayout = overlayOptions.layout;
+
+const els = {
+  feedList: document.getElementById("feedList"),
+  overlayFeedList: document.getElementById("overlayFeedList"),
+  loadingState: document.getElementById("loadingState"),
+  errorState: document.getElementById("errorState"),
+  errorText: document.getElementById("errorText"),
+  emptyState: document.getElementById("emptyState"),
+  feedMeta: document.getElementById("feedMeta"),
+  totalMessages: document.getElementById("totalMessages"),
+  countTwitch: document.getElementById("countTwitch"),
+  countX: document.getElementById("countX"),
+  countKick: document.getElementById("countKick"),
+  twitchChannel: document.getElementById("twitchChannel"),
+  xQuery: document.getElementById("xQuery"),
+  kickWebhook: document.getElementById("kickWebhook"),
+  adminToken: document.getElementById("adminToken"),
+  dashboardUrl: document.getElementById("dashboardUrl"),
+  obsUrl: document.getElementById("obsUrl"),
+  obsRightRailUrl: document.getElementById("obsRightRailUrl"),
+  obsLeftRailUrl: document.getElementById("obsLeftRailUrl"),
+  obsCompactUrl: document.getElementById("obsCompactUrl"),
+  overlayLink: document.getElementById("overlayLink"),
+  rightRailLink: document.getElementById("rightRailLink"),
+  compactOverlayLink: document.getElementById("compactOverlayLink"),
+  pauseFeed: document.getElementById("pauseFeed"),
+  overlayTitle: document.getElementById("overlayTitle"),
+  overlayMeta: document.getElementById("overlayMeta"),
+};
+
+const sourceStatus = {
+  twitch: { state: "idle", text: "idle" },
+  x: { state: "idle", text: "idle" },
+  kick: { state: "warn", text: "webhook" },
+};
+
+const state = {
+  messages: readLocalMessages(),
+  filter: "all",
+  loaded: false,
+  paused: false,
+  eventSource: null,
+  twitchSocket: null,
+  demoTimer: null,
+  xTimer: null,
+  xSyncInFlight: false,
+  xNewestId: localStorage.getItem("unifiedStreamChat.xNewestId") || "",
+};
+
+const origin = window.location.origin;
+const defaults = {
+  twitchChannel: params.get("twitch") || localStorage.getItem("unifiedStreamChat.twitchChannel") || "bitcoinaqua",
+  xQuery: params.get("x") || localStorage.getItem("unifiedStreamChat.xQuery") || "(@bitcoinaqua OR from:bitcoinaqua OR #bitcoinaqua) -is:retweet",
+  adminToken: localStorage.getItem("unifiedStreamChat.adminToken") || "",
+};
+
+setValue(els.twitchChannel, defaults.twitchChannel);
+setValue(els.xQuery, defaults.xQuery);
+setValue(els.adminToken, defaults.adminToken);
+setValue(els.kickWebhook, `${origin}/api/kick/webhook`);
+setValue(els.dashboardUrl, `${origin}/`);
+setValue(els.obsUrl, `${origin}/overlay`);
+setValue(els.obsRightRailUrl, `${origin}/overlay?layout=rail&position=right&messages=5`);
+setValue(els.obsLeftRailUrl, `${origin}/overlay?layout=rail&position=left&messages=5`);
+setValue(els.obsCompactUrl, `${origin}/overlay?layout=compact&position=bottom-right&messages=3`);
+if (els.overlayLink) els.overlayLink.href = `${origin}/overlay`;
+if (els.rightRailLink) els.rightRailLink.href = `${origin}/overlay?layout=rail&position=right&messages=5`;
+if (els.compactOverlayLink) els.compactOverlayLink.href = `${origin}/overlay?layout=compact&position=bottom-right&messages=3`;
+setText(els.overlayTitle, overlayOptions.title);
+
+bindDashboard();
+connectEvents();
+refreshState();
+setInterval(refreshState, isOverlay ? 2000 : 3000);
+
+function bindDashboard() {
+  if (isOverlay) return;
+
+  document.getElementById("connectTwitch")?.addEventListener("click", connectTwitch);
+  document.getElementById("syncX")?.addEventListener("click", syncX);
+  document.getElementById("autoX")?.addEventListener("click", toggleAutoX);
+  document.getElementById("copyKickWebhook")?.addEventListener("click", copyKickWebhook);
+  document.getElementById("demoPulse")?.addEventListener("click", toggleDemoPulse);
+  document.getElementById("demoAll")?.addEventListener("click", seedAll);
+  document.getElementById("demoTwitch")?.addEventListener("click", () => injectDemo("twitch"));
+  document.getElementById("demoX")?.addEventListener("click", () => injectDemo("x"));
+  document.getElementById("demoKick")?.addEventListener("click", () => injectDemo("kick"));
+  document.getElementById("clearFeed")?.addEventListener("click", clearFeed);
+  document.getElementById("retryState")?.addEventListener("click", refreshState);
+
+  els.pauseFeed?.addEventListener("click", () => {
+    state.paused = !state.paused;
+    els.pauseFeed.setAttribute("aria-pressed", String(state.paused));
+    els.pauseFeed.textContent = state.paused ? "Resume" : "Pause";
+  });
+
+  document.querySelectorAll("[data-filter]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.filter = button.dataset.filter || "all";
+      document.querySelectorAll("[data-filter]").forEach((node) => node.classList.toggle("active", node === button));
+      render();
+    });
+  });
+
+  [els.twitchChannel, els.xQuery, els.adminToken].forEach((input) => {
+    input?.addEventListener("change", persistInputs);
+  });
+}
+
+function connectEvents() {
+  if (!window.EventSource) return;
+  try {
+    state.eventSource = new EventSource("/api/events");
+    state.eventSource.addEventListener("state", (event) => {
+      const payload = JSON.parse(event.data);
+      mergeMessages(payload.messages || []);
+      updateStats();
+      state.loaded = true;
+      hideTransientStates();
+      render();
+    });
+    state.eventSource.addEventListener("error", () => {
+      setTimeout(() => {
+        try {
+          state.eventSource?.close();
+          state.eventSource = null;
+          connectEvents();
+        } catch {}
+      }, 3000);
+    });
+  } catch {}
+}
+
+async function refreshState() {
+  try {
+    const response = await fetch("/api/messages", { cache: "no-store" });
+    if (!response.ok) throw new Error(`messages returned ${response.status}`);
+    const payload = await response.json();
+    mergeMessages(payload.messages || []);
+    updateStats();
+    state.loaded = true;
+    hideTransientStates();
+    render();
+  } catch (error) {
+    if (!state.loaded) els.loadingState.hidden = true;
+    showError(error.message || "Could not load feed.");
+  }
+}
+
+function hideTransientStates() {
+  if (els.loadingState) els.loadingState.hidden = true;
+  if (els.errorState) els.errorState.hidden = true;
+}
+
+function mergeMessages(messages) {
+  const map = new Map(state.messages.map((message) => [message.id, message]));
+  for (const message of messages) map.set(message.id, normalizeLocalMessage(message));
+  state.messages = Array.from(map.values()).sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+  writeLocalMessages(state.messages);
+}
+
+function updateStats() {
+  const stats = statsFromMessages(state.messages);
+  setText(els.totalMessages, String(stats.total));
+  setText(els.countTwitch, String(stats.bySource.twitch || 0));
+  setText(els.countX, String(stats.bySource.x || 0));
+  setText(els.countKick, String(stats.bySource.kick || 0));
+  setText(els.feedMeta, `${stats.total} messages`);
+  for (const source of ["twitch", "x", "kick"]) {
+    const count = stats.bySource[source] || 0;
+    if (count > 0 && sourceStatus[source]?.state !== "live") {
+      sourceStatus[source] = { state: "live", text: `${count} seen` };
+    }
+  }
+}
+
+function render() {
+  renderStatuses();
+  if (state.paused && !isOverlay) return;
+
+  const filtered = state.messages.filter((message) => state.filter === "all" || message.source === state.filter);
+  const newest = filtered.slice().reverse();
+
+  if (els.emptyState) els.emptyState.hidden = newest.length > 0 || !state.loaded;
+  if (els.feedList) els.feedList.innerHTML = newest.slice(0, 120).map(renderMessage).join("");
+
+  const overlayMessages = state.messages.slice(-overlayOptions.limit).reverse();
+  if (els.overlayFeedList) {
+    els.overlayFeedList.innerHTML = overlayMessages.length ? overlayMessages.map(renderOverlayMessage).join("") : renderOverlayPlaceholder();
+  }
+  if (els.overlayMeta) els.overlayMeta.textContent = overlayMetaText(state.messages.length);
+}
+
+function renderStatuses() {
+  for (const [source, status] of Object.entries(sourceStatus)) {
+    const node = document.getElementById(`status-${source}`);
+    if (!node) continue;
+    node.dataset.state = status.state;
+    const label = node.querySelector("em");
+    if (label) label.textContent = status.text;
+  }
+}
+
+function renderMessage(message) {
+  return `
+    <li class="message ${escapeAttr(message.source)}">
+      <span class="source-label">${escapeHtml(labelFor(message.source))}</span>
+      <div class="message-main">
+        <div class="message-meta">
+          <strong class="message-author">${escapeHtml(message.displayName || message.author)}</strong>
+          <span class="message-channel">${escapeHtml(message.channel || "")}</span>
+        </div>
+        <p class="message-text">${linkify(message.text)}</p>
+      </div>
+      <time class="message-time" datetime="${escapeAttr(message.createdAt)}">${formatTime(message.createdAt)}</time>
+    </li>
+  `;
+}
+
+function renderOverlayMessage(message) {
+  return `
+    <li class="overlay-message ${escapeAttr(message.source)}">
+      <span class="source-label">${escapeHtml(labelFor(message.source))}</span>
+      <div>
+        <strong>${escapeHtml(message.displayName || message.author)}</strong>
+        <p>${escapeHtml(message.text)}</p>
+      </div>
+    </li>
+  `;
+}
+
+function renderOverlayPlaceholder() {
+  return `
+    <li class="overlay-message twitch">
+      <span class="source-label">LIVE</span>
+      <div>
+        <strong>standing by</strong>
+        <p>Waiting for Twitch, X, or Kick.</p>
+      </div>
+    </li>
+  `;
+}
+
+async function connectTwitch() {
+  const channel = cleanChannel(els.twitchChannel.value || "bitcoinaqua");
+  if (!channel) return;
+  persistInputs();
+
+  if (state.twitchSocket) {
+    state.twitchSocket.close();
+    state.twitchSocket = null;
+  }
+
+  setSourceStatus("twitch", "warn", "connecting");
+  const nick = `justinfan${Math.floor(Math.random() * 90000) + 10000}`;
+  const socket = new WebSocket("wss://irc-ws.chat.twitch.tv:443");
+  state.twitchSocket = socket;
+
+  socket.addEventListener("open", () => {
+    socket.send("CAP REQ :twitch.tv/tags twitch.tv/commands");
+    socket.send("PASS SCHMOOPIIE");
+    socket.send(`NICK ${nick}`);
+    socket.send(`JOIN #${channel}`);
+    setSourceStatus("twitch", "live", channel);
+  });
+
+  socket.addEventListener("message", (event) => {
+    const lines = String(event.data || "").split("\r\n").filter(Boolean);
+    for (const line of lines) {
+      if (line.startsWith("PING")) {
+        socket.send(line.replace("PING", "PONG"));
+        continue;
+      }
+      const message = parseTwitchLine(line, channel);
+      if (message) ingestMessage(message);
+    }
+  });
+
+  socket.addEventListener("close", () => {
+    if (state.twitchSocket === socket) setSourceStatus("twitch", "warn", "closed");
+  });
+
+  socket.addEventListener("error", () => setSourceStatus("twitch", "error", "error"));
+}
+
+async function syncX() {
+  if (state.xSyncInFlight) return;
+  const query = els.xQuery.value.trim();
+  if (!query) return;
+  persistInputs();
+  state.xSyncInFlight = true;
+  setSourceStatus("x", "warn", "syncing");
+
+  const url = new URL("/api/x/recent", origin);
+  url.searchParams.set("query", query);
+  url.searchParams.set("max_results", "20");
+  if (state.xNewestId) url.searchParams.set("since_id", state.xNewestId);
+
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || `X returned ${response.status}`);
+    if (payload.meta?.newest_id) {
+      state.xNewestId = payload.meta.newest_id;
+      localStorage.setItem("unifiedStreamChat.xNewestId", state.xNewestId);
+    }
+    mergeMessages(payload.messages || []);
+    setSourceStatus("x", "live", `${payload.messages?.length || 0} new`);
+    updateStats();
+    render();
+  } catch (error) {
+    setSourceStatus("x", "error", "needs token");
+    showError(error.message || "X sync failed.");
+  } finally {
+    state.xSyncInFlight = false;
+  }
+}
+
+function toggleAutoX() {
+  const button = document.getElementById("autoX");
+  if (state.xTimer) {
+    clearInterval(state.xTimer);
+    state.xTimer = null;
+    button?.setAttribute("aria-pressed", "false");
+    if (button) button.textContent = "Auto X";
+    if (sourceStatus.x?.state === "warn") setSourceStatus("x", "idle", "idle");
+    return;
+  }
+  button?.setAttribute("aria-pressed", "true");
+  if (button) button.textContent = "X Auto On";
+  syncX();
+  state.xTimer = setInterval(syncX, 25000);
+}
+
+async function copyKickWebhook() {
+  try {
+    await navigator.clipboard.writeText(els.kickWebhook.value);
+    setSourceStatus("kick", "live", "copied");
+  } catch {
+    els.kickWebhook.select();
+    setSourceStatus("kick", "warn", "select");
+  }
+}
+
+function toggleDemoPulse() {
+  const button = document.getElementById("demoPulse");
+  if (state.demoTimer) {
+    clearInterval(state.demoTimer);
+    state.demoTimer = null;
+    button?.setAttribute("aria-pressed", "false");
+    return;
+  }
+  let index = 0;
+  const sources = ["twitch", "x", "kick"];
+  state.demoTimer = setInterval(() => {
+    injectDemo(sources[index % sources.length]);
+    index += 1;
+  }, 1450);
+  button?.setAttribute("aria-pressed", "true");
+  sources.forEach((source) => setSourceStatus(source, "live", "demo"));
+  seedAll();
+}
+
+function seedAll() {
+  ["twitch", "x", "kick"].forEach((source) => injectDemo(source));
+}
+
+function injectDemo(source) {
+  const samples = {
+    twitch: [
+      "Twitch chat is flowing into one stream-ready feed.",
+      "Source labels make this way easier to read on air.",
+      "OBS overlay looks clean over gameplay.",
+    ],
+    x: [
+      "X posts are landing beside Twitch and Kick in real time.",
+      "This is the missing chat layer for multi-platform streams.",
+      "Auto-polling X while stream chat keeps moving.",
+    ],
+    kick: [
+      "Kick webhook message received by the unified feed.",
+      "Kick chat is ready for the OBS lower third.",
+      "One feed, three platforms, clean labels.",
+    ],
+  };
+  const list = samples[source] || samples.twitch;
+  const author = source === "x" ? "@stream_signal" : source === "kick" ? "kickviewer" : "twitchviewer";
+  ingestMessage({
+    source,
+    id: `demo-${source}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    author,
+    displayName: author,
+    channel: source === "x" ? els.xQuery.value : cleanChannel(els.twitchChannel.value || "bitcoinaqua"),
+    text: list[Math.floor(Math.random() * list.length)],
+    createdAt: new Date().toISOString(),
+  });
+}
+
+async function ingestMessage(message) {
+  mergeMessages([normalizeLocalMessage(message)]);
+  updateStats();
+  render();
+
+  try {
+    const headers = { "content-type": "application/json" };
+    const token = els.adminToken?.value?.trim();
+    if (token) headers.authorization = `Bearer ${token}`;
+    await fetch("/api/ingest", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ source: message.source, message }),
+    });
+  } catch {}
+}
+
+async function clearFeed() {
+  try {
+    const headers = { "content-type": "application/json" };
+    const token = els.adminToken?.value?.trim();
+    if (token) headers.authorization = `Bearer ${token}`;
+    const response = await fetch("/api/messages", { method: "DELETE", headers });
+    if (!response.ok) throw new Error(`clear returned ${response.status}`);
+    state.messages = [];
+    writeLocalMessages([]);
+    updateStats();
+    render();
+  } catch (error) {
+    showError(error.message || "Could not clear feed.");
+  }
+}
+
+function parseTwitchLine(line, fallbackChannel) {
+  let rest = line;
+  const tags = {};
+  if (rest.startsWith("@")) {
+    const end = rest.indexOf(" ");
+    const rawTags = rest.slice(1, end).split(";");
+    for (const rawTag of rawTags) {
+      const [key, value = ""] = rawTag.split("=");
+      tags[key] = value.replace(/\\s/g, " ");
+    }
+    rest = rest.slice(end + 1);
+  }
+
+  const match = rest.match(/^:([^!]+)![^ ]+ PRIVMSG #([^ ]+) :([\s\S]+)$/);
+  if (!match) return null;
+
+  return {
+    source: "twitch",
+    id: tags.id || `${match[2]}-${Date.now()}-${Math.random()}`,
+    platformId: tags.id || "",
+    author: match[1],
+    displayName: tags["display-name"] || match[1],
+    text: match[3],
+    channel: match[2] || fallbackChannel,
+    createdAt: tags["tmi-sent-ts"] ? new Date(Number(tags["tmi-sent-ts"])).toISOString() : new Date().toISOString(),
+    badges: tags.badges ? tags.badges.split(",").filter(Boolean) : [],
+  };
+}
+
+function normalizeLocalMessage(message) {
+  const source = message.source || "twitch";
+  const createdAt = message.createdAt || new Date().toISOString();
+  return {
+    id: message.id?.startsWith(`${source}:`) ? message.id : `${source}:${message.id || Date.now()}`,
+    source,
+    sourceLabel: labelFor(source),
+    author: message.author || "viewer",
+    displayName: message.displayName || message.author || "viewer",
+    text: message.text || "",
+    channel: message.channel || "",
+    createdAt,
+    receivedAt: message.receivedAt || new Date().toISOString(),
+    url: message.url || "",
+  };
+}
+
+function persistInputs() {
+  localStorage.setItem("unifiedStreamChat.twitchChannel", cleanChannel(els.twitchChannel?.value || ""));
+  localStorage.setItem("unifiedStreamChat.xQuery", els.xQuery?.value || "");
+  localStorage.setItem("unifiedStreamChat.adminToken", els.adminToken?.value || "");
+}
+
+function readLocalMessages() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(localMessageKey) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalMessages(messages) {
+  try {
+    localStorage.setItem(localMessageKey, JSON.stringify(messages.slice(-240)));
+  } catch {}
+}
+
+function statsFromMessages(messages) {
+  const bySource = { twitch: 0, x: 0, kick: 0 };
+  for (const message of messages) {
+    if (bySource[message.source] !== undefined) bySource[message.source] += 1;
+  }
+  return { total: messages.length, bySource };
+}
+
+function setSourceStatus(source, statusState, text) {
+  sourceStatus[source] = { state: statusState, text };
+  renderStatuses();
+}
+
+function showError(message) {
+  if (!els.errorState) return;
+  els.errorText.textContent = message;
+  els.errorState.hidden = false;
+}
+
+function labelFor(source) {
+  if (source === "x") return "X";
+  return source.charAt(0).toUpperCase() + source.slice(1);
+}
+
+function readOverlayOptions() {
+  const layout = readEnum(params.get("layout"), ["lower", "rail", "compact"], "lower");
+  const defaultLimit = layout === "rail" ? 5 : layout === "compact" ? 3 : 2;
+  return {
+    layout,
+    position: readEnum(params.get("position"), ["left", "right", "bottom-left", "bottom-right"], layout === "rail" ? "right" : "bottom-right"),
+    limit: clamp(Number(params.get("messages") || defaultLimit), 1, 8, defaultLimit),
+    title: (params.get("title") || "Unified Chat").slice(0, 32),
+  };
+}
+
+function readEnum(value, allowed, fallback) {
+  return allowed.includes(value) ? value : fallback;
+}
+
+function clamp(value, min, max, fallback = min) {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+function overlayMetaText(total) {
+  const layoutLabel = overlayOptions.layout === "rail" ? "Vertical rail" : overlayOptions.layout === "compact" ? "Compact box" : "Lower third";
+  return `${layoutLabel} - ${total} total`;
+}
+
+function cleanChannel(value) {
+  return String(value || "").trim().replace(/^[@#]/, "").toLowerCase();
+}
+
+function formatTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "now";
+  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
+}
+
+function linkify(text) {
+  return escapeHtml(text).replace(/https?:\/\/[^\s<]+/g, (url) => `<a href="${escapeAttr(url)}" target="_blank" rel="noreferrer">${escapeHtml(url)}</a>`);
+}
+
+function setText(node, value) {
+  if (node) node.textContent = value;
+}
+
+function setValue(node, value) {
+  if (node) node.value = value;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value).replace(/`/g, "&#096;");
+}

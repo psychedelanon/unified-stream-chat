@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Unified Stream Chat</title>
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body>
+    <main id="app" class="app-shell" data-mode="dashboard">
+      <section class="dashboard" aria-label="Unified stream chat dashboard">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Streamer Utility</p>
+            <h1>Unified Stream Chat</h1>
+          </div>
+          <div class="top-actions">
+            <a id="overlayLink" class="button-link" href="/overlay" target="_blank" rel="noreferrer">OBS Overlay</a>
+            <button id="pauseFeed" type="button" aria-pressed="false">Pause</button>
+          </div>
+        </header>
+
+        <section class="status-strip" aria-label="Source status">
+          <div class="source-card twitch" id="status-twitch" data-state="idle">
+            <span class="source-dot"></span>
+            <strong>Twitch</strong>
+            <em>idle</em>
+          </div>
+          <div class="source-card x" id="status-x" data-state="idle">
+            <span class="source-dot"></span>
+            <strong>X</strong>
+            <em>idle</em>
+          </div>
+          <div class="source-card kick" id="status-kick" data-state="idle">
+            <span class="source-dot"></span>
+            <strong>Kick</strong>
+            <em>webhook</em>
+          </div>
+        </section>
+
+        <section class="workspace">
+          <aside class="panel controls" aria-label="Source controls">
+            <section class="panel-section">
+              <h2>Connect</h2>
+              <label>
+                Twitch channel
+                <input id="twitchChannel" name="twitchChannel" autocomplete="off" spellcheck="false" placeholder="streamer" />
+              </label>
+              <button id="connectTwitch" type="button">Connect Twitch</button>
+
+              <label>
+                X query
+                <input id="xQuery" name="xQuery" autocomplete="off" spellcheck="false" placeholder="@streamer OR #hashtag" />
+              </label>
+              <div class="split-buttons">
+                <button id="syncX" type="button">Sync X</button>
+                <button id="autoX" type="button" aria-pressed="false">Auto X</button>
+              </div>
+
+              <label>
+                Kick webhook
+                <input id="kickWebhook" name="kickWebhook" readonly />
+              </label>
+              <button id="copyKickWebhook" type="button">Copy Webhook</button>
+            </section>
+
+            <section class="panel-section">
+              <h2>Demo</h2>
+              <label>
+                Admin token
+                <input id="adminToken" name="adminToken" type="password" autocomplete="off" />
+              </label>
+              <div class="split-buttons">
+                <button id="demoPulse" type="button" aria-pressed="false">Demo Pulse</button>
+                <button id="demoAll" type="button">Seed All</button>
+              </div>
+              <div class="split-buttons three">
+                <button id="demoTwitch" type="button">Twitch</button>
+                <button id="demoX" type="button">X</button>
+                <button id="demoKick" type="button">Kick</button>
+              </div>
+              <button id="clearFeed" class="danger" type="button">Clear Feed</button>
+            </section>
+          </aside>
+
+          <section class="panel feed-panel" aria-label="Unified live feed">
+            <div class="feed-toolbar">
+              <div>
+                <h2>Live Feed</h2>
+                <p id="feedMeta">Loading feed</p>
+              </div>
+              <div class="segmented" role="group" aria-label="Filter by source">
+                <button type="button" class="active" data-filter="all">All</button>
+                <button type="button" data-filter="twitch">Twitch</button>
+                <button type="button" data-filter="x">X</button>
+                <button type="button" data-filter="kick">Kick</button>
+              </div>
+            </div>
+
+            <div id="loadingState" class="state-block">
+              <span class="skeleton"></span>
+              <span class="skeleton wide"></span>
+              <span class="skeleton"></span>
+            </div>
+            <div id="errorState" class="state-block error" hidden>
+              <strong>Feed unavailable</strong>
+              <span id="errorText">Retrying.</span>
+              <button id="retryState" type="button">Retry</button>
+            </div>
+            <div id="emptyState" class="state-block empty" hidden>
+              <strong>No messages yet</strong>
+              <span>Connect a source, configure Kick webhooks, or seed a demo.</span>
+            </div>
+            <ol id="feedList" class="feed-list" aria-live="polite"></ol>
+          </section>
+
+          <aside class="panel ops" aria-label="Operational links">
+            <section class="panel-section">
+              <h2>Stats</h2>
+              <div class="stat-row"><span>Total</span><strong id="totalMessages">0</strong></div>
+              <div class="stat-row"><span>Twitch</span><strong id="countTwitch">0</strong></div>
+              <div class="stat-row"><span>X</span><strong id="countX">0</strong></div>
+              <div class="stat-row"><span>Kick</span><strong id="countKick">0</strong></div>
+            </section>
+
+            <section class="panel-section">
+              <h2>OBS</h2>
+              <label>
+                Dashboard
+                <input id="dashboardUrl" readonly />
+              </label>
+              <label>
+                Lower third
+                <input id="obsUrl" readonly />
+              </label>
+              <label>
+                Right rail
+                <input id="obsRightRailUrl" readonly />
+              </label>
+              <label>
+                Left rail
+                <input id="obsLeftRailUrl" readonly />
+              </label>
+              <label>
+                Compact box
+                <input id="obsCompactUrl" readonly />
+              </label>
+              <div class="split-buttons">
+                <a id="rightRailLink" class="button-link" href="/overlay?layout=rail&position=right&messages=5" target="_blank" rel="noreferrer">Preview Rail</a>
+                <a id="compactOverlayLink" class="button-link" href="/overlay?layout=compact&position=bottom-right&messages=3" target="_blank" rel="noreferrer">Preview Box</a>
+              </div>
+              <p class="note">Use a 1920 x 1080 OBS browser source; choose lower third, vertical rail, or compact box per scene.</p>
+            </section>
+          </aside>
+        </section>
+      </section>
+
+      <section class="overlay" aria-label="OBS chat overlay">
+        <div class="overlay-card">
+          <div class="overlay-heading">
+            <strong id="overlayTitle">Unified Chat</strong>
+            <span id="overlayMeta">Twitch + X + Kick</span>
+          </div>
+          <ol id="overlayFeedList" class="overlay-feed" aria-live="polite"></ol>
+        </div>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,23 @@
+{
+  "name": "unified-stream-chat",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Production-ready unified Twitch + X + Kick chat feed for streamers and OBS overlays.",
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "dev": "node src/server.mjs",
+    "start": "node src/server.mjs",
+    "seed": "node scripts/seed-demo.mjs",
+    "verify": "node scripts/verify.mjs",
+    "smoke:live": "node scripts/smoke-live.mjs",
+    "check": "node --check src/env.mjs && node --check src/server.mjs && node --check src/state.mjs && node --check public/app.js && node --check scripts/setup.mjs && node --check scripts/doctor.mjs && node --check scripts/seed-demo.mjs && node --check scripts/verify.mjs && node --check scripts/smoke-live.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "playwright": "^1.59.1"
+  }
+}

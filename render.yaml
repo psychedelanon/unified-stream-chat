@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: unified-stream-chat
+    env: node
+    plan: starter
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: 8787
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: STREAM_CHAT_ADMIN_TOKEN
+        generateValue: true
+      - key: X_BEARER_TOKEN
+        sync: false
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+      - key: KICK_PUBLIC_KEY
+        sync: false
