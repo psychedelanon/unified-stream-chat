@@ -16,6 +16,7 @@
 // going live and forget about it. First run: log into X in the opened
 // browser window; the session persists in .local/x-chat-profile.
 
+import { execFile } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -62,11 +63,34 @@ console.log(`  target:    ${args.url || `@${args.user} (waiting for live broadca
 console.log(`  ingest:    ${ingestBase}/api/ingest`);
 if (args.label) console.log(`  tag:       ${args.label} ${args.color || ""}`);
 
-const context = await chromium.launchPersistentContext(profileDir, {
-  headless: false,
-  viewport: { width: 1380, height: 900 },
-  args: ["--disable-blink-features=AutomationControlled"],
-});
+const context = await launchContext();
+
+async function launchContext() {
+  const options = {
+    headless: false,
+    viewport: { width: 1380, height: 900 },
+    args: ["--disable-blink-features=AutomationControlled"],
+  };
+  try {
+    return await chromium.launchPersistentContext(profileDir, options);
+  } catch (error) {
+    const message = String(error?.message || "");
+    if (!message.includes("existing browser session") && !message.includes("already in use")) throw error;
+    console.log("Profile is locked by a stale browser; cleaning up and retrying.");
+    await killStaleProfileBrowsers();
+    return await chromium.launchPersistentContext(profileDir, options);
+  }
+}
+
+function killStaleProfileBrowsers() {
+  return new Promise((resolve) => {
+    execFile("powershell", [
+      "-NoProfile",
+      "-Command",
+      "Get-CimInstance Win32_Process -Filter \"Name like '%chrome%'\" | Where-Object { $_.CommandLine -like '*x-chat-profile*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }",
+    ], () => setTimeout(resolve, 2000));
+  });
+}
 const page = context.pages()[0] || (await context.newPage());
 
 page.on("websocket", (socket) => {
@@ -106,7 +130,7 @@ if (args.url) {
 // as it starts, and go back to waiting when it ends. Runs until Ctrl+C.
 async function attendant(page) {
   const probe = await context.newPage();
-  await page.goto(`https://x.com/${args.user}`, { waitUntil: "domcontentloaded" }).catch(() => {});
+  page.goto(`https://x.com/${args.user}`, { waitUntil: "domcontentloaded" }).catch(() => {});
   for (;;) {
     const url = await findBroadcastUrl(probe);
     await page.goto(url, { waitUntil: "domcontentloaded" }).catch(() => {});
