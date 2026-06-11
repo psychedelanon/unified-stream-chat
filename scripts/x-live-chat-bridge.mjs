@@ -84,12 +84,6 @@ await page.exposeFunction("uscEmitChat", (message) => {
   }
 });
 
-const broadcastUrl = args.url || (await findBroadcastUrl(page, args.user));
-await page.goto(broadcastUrl, { waitUntil: "domcontentloaded" });
-console.log(`Attached to ${broadcastUrl}`);
-console.log("If X asks you to log in, do it in this window; chat capture starts automatically.");
-
-await installDomObserver(page);
 setInterval(() => installDomObserver(page).catch(() => {}), 15000);
 
 process.on("SIGINT", async () => {
@@ -98,21 +92,68 @@ process.on("SIGINT", async () => {
   process.exit(0);
 });
 
-async function findBroadcastUrl(page, user) {
-  console.log(`Watching x.com/${user} for a live broadcast (Ctrl+C to stop)...`);
+console.log("If X asks you to log in, do it in the opened window; capture starts automatically.");
+
+if (args.url) {
+  await page.goto(args.url, { waitUntil: "domcontentloaded" });
+  console.log(`Attached to ${args.url}`);
+  await installDomObserver(page).catch(() => {});
+} else {
+  await attendant(page);
+}
+
+// Set-and-forget mode: keep watching the profile, attach to each broadcast
+// as it starts, and go back to waiting when it ends. Runs until Ctrl+C.
+async function attendant(page) {
+  const probe = await context.newPage();
+  await page.goto(`https://x.com/${args.user}`, { waitUntil: "domcontentloaded" }).catch(() => {});
   for (;;) {
-    try {
-      await page.goto(`https://x.com/${user}`, { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(6000);
-      const href = await page.evaluate(() => {
-        const link = document.querySelector('a[href*="/i/broadcasts/"]');
-        return link ? link.href : "";
-      });
-      if (href) return href;
-    } catch {}
-    console.log(`@${user} is not live yet; checking again in 30s.`);
-    await page.waitForTimeout(30000);
+    const url = await findBroadcastUrl(probe);
+    await page.goto(url, { waitUntil: "domcontentloaded" }).catch(() => {});
+    console.log(`Attached to ${url}`);
+    await installDomObserver(page).catch(() => {});
+    await waitForBroadcastChange(probe, url);
+    console.log("Broadcast ended or changed; watching for the next one.");
   }
+}
+
+async function findBroadcastUrl(probe) {
+  console.log(`Watching x.com/${args.user} for a live broadcast (Ctrl+C to stop)...`);
+  for (;;) {
+    const href = await probeBroadcastHref(probe);
+    if (href) return href;
+    await probe.waitForTimeout(30000);
+  }
+}
+
+async function waitForBroadcastChange(probe, currentUrl) {
+  const currentId = broadcastId(currentUrl);
+  let missing = 0;
+  for (;;) {
+    await probe.waitForTimeout(120000);
+    const href = await probeBroadcastHref(probe);
+    if (href && broadcastId(href) !== currentId) return;
+    if (!href) {
+      missing += 1;
+      if (missing >= 2) return;
+    } else {
+      missing = 0;
+    }
+  }
+}
+
+async function probeBroadcastHref(probe) {
+  try {
+    await probe.goto(`https://x.com/${args.user}`, { waitUntil: "domcontentloaded" });
+    await probe.waitForTimeout(6000);
+    return await probe.evaluate(() => document.querySelector('a[href*="/i/broadcasts/"]')?.href || "");
+  } catch {
+    return "";
+  }
+}
+
+function broadcastId(url) {
+  return (String(url).match(/\/i\/broadcasts\/(\w+)/) || [])[1] || "";
 }
 
 function handlePayload(payload) {

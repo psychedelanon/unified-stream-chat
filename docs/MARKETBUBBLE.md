@@ -41,10 +41,16 @@ platform on or off (dim + struck-through = off).
   replies are all X offers officially.
 - **X live chat** (optional, runs on the operator's PC): the repo includes a
   bridge that opens the live broadcast in a real browser and relays its chat
-  into the feed. With the config file in place (`.local/x-live.config`), run
-  `npm run x-live` before going live — it waits for the broadcast to start,
-  attaches, and tags messages automatically. First run asks you to log into
-  X in the window it opens; after that it remembers.
+  into the feed. It is set-and-forget: start it once and leave it running
+  minimized — it watches the show's X account, attaches automatically every
+  time a broadcast starts, and goes back to waiting when it ends. Nothing to
+  do on show day.
+  - Start manually: `npm run x-live`
+  - Start with Windows: put a shortcut to `scripts\x-live-forever.bat` in
+    `shell:startup` (Win+R, type `shell:startup`). It also auto-restarts the
+    bridge if it ever crashes.
+  - First run only: log into X in the window it opens; the session persists.
+  - The account it watches and the host tag live in `.local/x-live.config`.
 - The OBS overlay updates by itself. Add it as a Browser Source at
   1920x1080; pick lower-third, rail, or compact via the URLs in the
   dashboard's OBS panel.
