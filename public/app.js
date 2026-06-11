@@ -92,7 +92,7 @@ const boxTitle = roomName.charAt(0).toUpperCase() + roomName.slice(1);
 const boxOverlayUrl = `${origin}/overlay?layout=box&title=${encodeURIComponent(boxTitle)}`;
 setValue(els.obsBoxUrl, boxOverlayUrl);
 if (els.boxOverlayLink) els.boxOverlayLink.href = boxOverlayUrl;
-if (els.overlayLink) els.overlayLink.href = `${origin}/overlay`;
+if (els.overlayLink) els.overlayLink.href = boxOverlayUrl;
 if (els.rightRailLink) els.rightRailLink.href = `${origin}/overlay?layout=rail&position=right&messages=5`;
 if (els.compactOverlayLink) els.compactOverlayLink.href = `${origin}/overlay?layout=compact&position=bottom-right&messages=3`;
 setText(els.overlayTitle, overlayOptions.title);

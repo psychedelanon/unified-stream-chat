@@ -813,6 +813,7 @@ body[data-overlay-layout="compact"] .overlay-message p {
 body[data-overlay-layout="box"].is-overlay .overlay {
   width: 100vw;
   height: 100vh;
+  overflow: hidden;
 }
 
 body[data-overlay-layout="box"] .overlay-card {
@@ -826,11 +827,11 @@ body[data-overlay-layout="box"] .overlay-card {
   align-items: stretch;
   padding: 0;
   border: none;
-  border-radius: 18px;
+  border-radius: 0;
   overflow: hidden;
   background:
     linear-gradient(180deg, rgba(10, 12, 18, 0.97), rgba(10, 12, 18, 0.9));
-  box-shadow: inset 0 0 0 2px rgba(230, 238, 255, 0.12), 0 24px 64px rgba(0, 0, 0, 0.55);
+  box-shadow: inset 0 0 0 2px rgba(230, 238, 255, 0.12);
 }
 
 body[data-overlay-layout="box"] .overlay-heading {
