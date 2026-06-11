@@ -38,6 +38,8 @@ const els = {
   obsRightRailUrl: document.getElementById("obsRightRailUrl"),
   obsLeftRailUrl: document.getElementById("obsLeftRailUrl"),
   obsCompactUrl: document.getElementById("obsCompactUrl"),
+  obsBoxUrl: document.getElementById("obsBoxUrl"),
+  boxOverlayLink: document.getElementById("boxOverlayLink"),
   overlayLink: document.getElementById("overlayLink"),
   rightRailLink: document.getElementById("rightRailLink"),
   compactOverlayLink: document.getElementById("compactOverlayLink"),
@@ -86,6 +88,10 @@ setValue(els.obsUrl, `${origin}/overlay`);
 setValue(els.obsRightRailUrl, `${origin}/overlay?layout=rail&position=right&messages=5`);
 setValue(els.obsLeftRailUrl, `${origin}/overlay?layout=rail&position=left&messages=5`);
 setValue(els.obsCompactUrl, `${origin}/overlay?layout=compact&position=bottom-right&messages=3`);
+const boxTitle = roomName.charAt(0).toUpperCase() + roomName.slice(1);
+const boxOverlayUrl = `${origin}/overlay?layout=box&title=${encodeURIComponent(boxTitle)}`;
+setValue(els.obsBoxUrl, boxOverlayUrl);
+if (els.boxOverlayLink) els.boxOverlayLink.href = boxOverlayUrl;
 if (els.overlayLink) els.overlayLink.href = `${origin}/overlay`;
 if (els.rightRailLink) els.rightRailLink.href = `${origin}/overlay?layout=rail&position=right&messages=5`;
 if (els.compactOverlayLink) els.compactOverlayLink.href = `${origin}/overlay?layout=compact&position=bottom-right&messages=3`;
@@ -112,6 +118,15 @@ function bindDashboard() {
     localStorage.setItem("unifiedStreamChat.room", currentRoom());
     state.localHosts = readLocalHosts(currentRoom());
     refreshConnections();
+  });
+  document.getElementById("copyBoxUrl")?.addEventListener("click", async (event) => {
+    try {
+      await navigator.clipboard.writeText(els.obsBoxUrl?.value || "");
+      event.target.textContent = "Copied";
+      setTimeout(() => { event.target.textContent = "Copy URL"; }, 1500);
+    } catch {
+      els.obsBoxUrl?.select();
+    }
   });
   document.getElementById("demoPulse")?.addEventListener("click", toggleDemoPulse);
   document.getElementById("demoAll")?.addEventListener("click", seedAll);
@@ -218,9 +233,13 @@ function render() {
   if (els.emptyState) els.emptyState.hidden = newest.length > 0 || !state.loaded;
   if (els.feedList) els.feedList.innerHTML = newest.slice(0, 120).map(renderMessage).join("");
 
-  const overlayMessages = state.messages.slice(-overlayOptions.limit).reverse();
+  // The box layout reads like a real chat: oldest to newest, newest at the
+  // bottom, auto-scrolled. Other layouts show newest first.
+  const recent = state.messages.slice(-overlayOptions.limit);
+  const overlayMessages = overlayOptions.layout === "box" ? recent : recent.reverse();
   if (els.overlayFeedList) {
     els.overlayFeedList.innerHTML = overlayMessages.length ? overlayMessages.map(renderOverlayMessage).join("") : renderOverlayPlaceholder();
+    if (overlayOptions.layout === "box") els.overlayFeedList.scrollTop = els.overlayFeedList.scrollHeight;
   }
   if (els.overlayMeta) els.overlayMeta.textContent = overlayMetaText(state.messages.length);
 }
@@ -836,12 +855,13 @@ function applyIdentityRule(message) {
 }
 
 function readOverlayOptions() {
-  const layout = readEnum(params.get("layout"), ["lower", "rail", "compact"], "lower");
-  const defaultLimit = layout === "rail" ? 5 : layout === "compact" ? 3 : 2;
+  const layout = readEnum(params.get("layout"), ["lower", "rail", "compact", "box"], "lower");
+  const defaultLimit = layout === "box" ? 14 : layout === "rail" ? 5 : layout === "compact" ? 3 : 2;
+  const maxLimit = layout === "box" ? 30 : 8;
   return {
     layout,
     position: readEnum(params.get("position"), ["left", "right", "bottom-left", "bottom-right"], layout === "rail" ? "right" : "bottom-right"),
-    limit: clamp(Number(params.get("messages") || defaultLimit), 1, 8, defaultLimit),
+    limit: clamp(Number(params.get("messages") || defaultLimit), 1, maxLimit, defaultLimit),
     title: (params.get("title") || "Unified Chat").slice(0, 32),
   };
 }
@@ -856,7 +876,10 @@ function clamp(value, min, max, fallback = min) {
 }
 
 function overlayMetaText(total) {
-  const layoutLabel = overlayOptions.layout === "rail" ? "Vertical rail" : overlayOptions.layout === "compact" ? "Compact box" : "Lower third";
+  const layoutLabel = overlayOptions.layout === "box" ? "Chat box"
+    : overlayOptions.layout === "rail" ? "Vertical rail"
+    : overlayOptions.layout === "compact" ? "Compact box"
+    : "Lower third";
   return `${layoutLabel} - ${total} total`;
 }
 

@@ -9,8 +9,9 @@ Nobody logs into anything — you just tell it which channels to watch.
 | What | URL |
 | --- | --- |
 | Dashboard | `https://unified-stream-chat.vercel.app/?room=marketbubble` |
-| OBS overlay (lower third) | `https://unified-stream-chat.vercel.app/overlay` |
-| OBS overlay (side rail) | `https://unified-stream-chat.vercel.app/overlay?layout=rail&position=right&messages=5` |
+| **OBS chat box** (recommended) | `https://unified-stream-chat.vercel.app/overlay?layout=box&title=MarketBubble` |
+| OBS lower third | `https://unified-stream-chat.vercel.app/overlay` |
+| OBS side rail | `https://unified-stream-chat.vercel.app/overlay?layout=rail&position=right&messages=5` |
 
 ## One-time setup (2 minutes)
 
@@ -39,9 +40,11 @@ platform on or off (dim + struck-through = off).
   every 25 seconds while the dashboard is open. (X does not allow any app to
   read the chat inside an X live broadcast — replies and mentions are what X
   offers. Viewers replying to the stream announcement post all show up.)
-- The OBS overlay updates by itself. Add it as a Browser Source at
-  1920x1080; pick lower-third, rail, or compact via the URLs in the
-  dashboard's OBS panel.
+- The OBS overlay updates by itself. Add the **chat box** as a Browser
+  Source (copy its URL from the dashboard's OBS Overlays panel, or use the
+  link in the table above) and size it to your scene — it's a clean
+  scrolling chat box with each host in their own color. Lower-third and rail
+  layouts are there too if you prefer them.
 
 ## Pause / clean up
 

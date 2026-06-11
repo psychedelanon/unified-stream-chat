@@ -1,22 +1,24 @@
 # Unified Stream Chat
 
-Unified Stream Chat is a production-ready multi-platform chat layer for streamers. It combines Twitch, X, and Kick into one live feed with visible source labels, plus a transparent OBS overlay that can sit on top of any stream layout.
+Unified Stream Chat is a production-ready multi-platform chat layer for streamers. Add a streamer by name and the channels they use, and their Twitch, X, and Kick chats merge into one live feed — color-tagged per host — with a clean transparent OBS overlay. No login or OAuth from the streamers themselves.
 
-This is the standalone contest product. The BITCOINAQUA Sproto stream uses it as one integration example, but any streamer can run it for their own show.
+Built for multi-host shows: several streamers' chats in one box, each in their own color, so a co-streamed broadcast reads as a single conversation.
 
 Live demo: <https://unified-stream-chat.vercel.app>
 
 ## Screenshots
 
-Dashboard with the unified, source-labeled feed:
+Clean OBS chat box — multiple hosts merged into one feed, each color-tagged:
+
+![OBS chat box overlay with per-host color tags](docs/images/overlay-box.png)
+
+Dashboard: add chat watchers, see the unified source-labeled feed:
 
 ![Dashboard with unified Twitch + X + Kick feed](docs/images/dashboard.png)
 
-Transparent OBS lower-third overlay:
+Transparent OBS lower-third and vertical rail overlays are also included:
 
 ![OBS lower-third overlay](docs/images/overlay-lower-third.png)
-
-Vertical side rail for broadcast layouts that already use a lower third:
 
 ![OBS vertical rail overlay](docs/images/overlay-rail.png)
 
@@ -82,16 +84,20 @@ every message carries both a platform label and a colored host tag.
 ## OBS Setup
 
 1. Add a Browser Source.
-2. URL: choose one:
+2. URL — the **chat box** is the recommended overlay (copy the exact URL from
+   the dashboard's OBS Overlays panel, or use):
+   - Chat box: `http://127.0.0.1:8787/overlay?layout=box`
    - Lower third: `http://127.0.0.1:8787/overlay`
    - Right rail: `http://127.0.0.1:8787/overlay?layout=rail&position=right&messages=5`
-   - Left rail: `http://127.0.0.1:8787/overlay?layout=rail&position=left&messages=5`
-   - Compact box: `http://127.0.0.1:8787/overlay?layout=compact&position=bottom-right&messages=3`
-3. Width: `1920`
-4. Height: `1080`
-5. Enable transparent background if OBS prompts for it.
+   - Compact corner: `http://127.0.0.1:8787/overlay?layout=compact&position=bottom-right&messages=3`
+3. Size the source to your scene (the chat box fills whatever width/height you
+   give it; the lower third / rail / compact layouts assume a 1920x1080 source).
+4. Enable transparent background if OBS prompts for it.
 
-The lower-third renders the latest two messages. The rail renders up to five messages in a vertical box so it can sit beside a guest/source frame without covering a show's bottom banner or ticker.
+The chat box is a clean scrolling panel (newest at the bottom, like real chat),
+showing the latest ~14 messages with platform badges and per-host color tags.
+Add `&title=YourShow` to brand the header. The lower third, rail, and compact
+corner layouts are alternatives for shows that already have a chat element.
 
 ## Production Setup
 

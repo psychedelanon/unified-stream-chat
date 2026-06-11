@@ -130,32 +130,40 @@
             </section>
 
             <section class="panel-section">
-              <h2>OBS</h2>
+              <h2>OBS Overlays</h2>
               <label>
-                Dashboard
-                <input id="dashboardUrl" readonly />
-              </label>
-              <label>
-                Lower third
-                <input id="obsUrl" readonly />
-              </label>
-              <label>
-                Right rail
-                <input id="obsRightRailUrl" readonly />
-              </label>
-              <label>
-                Left rail
-                <input id="obsLeftRailUrl" readonly />
-              </label>
-              <label>
-                Compact box
-                <input id="obsCompactUrl" readonly />
+                Chat box (recommended)
+                <input id="obsBoxUrl" readonly />
               </label>
               <div class="split-buttons">
-                <a id="rightRailLink" class="button-link" href="/overlay?layout=rail&position=right&messages=5" target="_blank" rel="noreferrer">Preview Rail</a>
-                <a id="compactOverlayLink" class="button-link" href="/overlay?layout=compact&position=bottom-right&messages=3" target="_blank" rel="noreferrer">Preview Box</a>
+                <a id="boxOverlayLink" class="button-link primary" href="/overlay?layout=box" target="_blank" rel="noreferrer">Open Chat Box</a>
+                <button id="copyBoxUrl" type="button">Copy URL</button>
               </div>
-              <p class="note">Use a 1920 x 1080 OBS browser source; choose lower third, vertical rail, or compact box per scene.</p>
+              <p class="note">A clean scrolling chat box. Add an OBS Browser Source, paste this URL, and size it to your scene.</p>
+
+              <details class="advanced">
+                <summary>Other overlays</summary>
+                <label>
+                  Dashboard
+                  <input id="dashboardUrl" readonly />
+                </label>
+                <label>
+                  Lower third
+                  <input id="obsUrl" readonly />
+                </label>
+                <label>
+                  Right rail
+                  <input id="obsRightRailUrl" readonly />
+                </label>
+                <label>
+                  Left rail
+                  <input id="obsLeftRailUrl" readonly />
+                </label>
+                <label>
+                  Compact corner
+                  <input id="obsCompactUrl" readonly />
+                </label>
+              </details>
             </section>
           </aside>
         </section>
