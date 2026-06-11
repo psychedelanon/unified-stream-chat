@@ -46,7 +46,7 @@ args.label = args.label || process.env.X_LIVE_LABEL || "";
 args.color = args.color || process.env.X_LIVE_COLOR || "";
 args.token = args.token || process.env.X_LIVE_TOKEN || "";
 
-if (!args.url && !args.user) {
+if (!args.login && !args.url && !args.user) {
   console.error("Missing --user <X handle> or --url <broadcast URL> (or X_LIVE_USER in .env)");
   process.exit(1);
 }
@@ -66,20 +66,44 @@ if (args.label) console.log(`  tag:       ${args.label} ${args.color || ""}`);
 const context = await launchContext();
 
 async function launchContext() {
-  const options = {
+  const base = {
     headless: false,
-    viewport: { width: 1380, height: 900 },
-    args: ["--disable-blink-features=AutomationControlled"],
+    viewport: null,
+    args: [
+      "--disable-blink-features=AutomationControlled",
+      "--disable-features=IsolateOrigins,site-per-process",
+      "--start-maximized",
+    ],
+    ignoreDefaultArgs: ["--enable-automation"],
   };
-  try {
-    return await chromium.launchPersistentContext(profileDir, options);
-  } catch (error) {
-    const message = String(error?.message || "");
-    if (!message.includes("existing browser session") && !message.includes("already in use")) throw error;
-    console.log("Profile is locked by a stale browser; cleaning up and retrying.");
-    await killStaleProfileBrowsers();
-    return await chromium.launchPersistentContext(profileDir, options);
+  // X white-screens Playwright's bundled Chromium on login; the user's real
+  // Chrome passes its fingerprint checks. Fall back to bundled if absent.
+  const attempts = [{ ...base, channel: "chrome" }, base];
+  let lastError;
+  for (const options of attempts) {
+    try {
+      const context = await chromium.launchPersistentContext(profileDir, options);
+      await hardenContext(context);
+      return context;
+    } catch (error) {
+      const message = String(error?.message || "");
+      if (message.includes("existing browser session") || message.includes("already in use")) {
+        console.log("Profile is locked by a stale browser; cleaning up and retrying.");
+        await killStaleProfileBrowsers();
+        const context = await chromium.launchPersistentContext(profileDir, options);
+        await hardenContext(context);
+        return context;
+      }
+      lastError = error;
+    }
   }
+  throw lastError;
+}
+
+async function hardenContext(context) {
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, "webdriver", { get: () => undefined });
+  });
 }
 
 function killStaleProfileBrowsers() {
@@ -116,14 +140,48 @@ process.on("SIGINT", async () => {
   process.exit(0);
 });
 
-console.log("If X asks you to log in, do it in the opened window; capture starts automatically.");
-
-if (args.url) {
+if (args.login) {
+  await runLogin(page);
+} else if (args.url) {
   await page.goto(args.url, { waitUntil: "domcontentloaded" });
   console.log(`Attached to ${args.url}`);
   await installDomObserver(page).catch(() => {});
 } else {
+  if (!(await isLoggedIn(page))) {
+    console.log("\n  This browser is not signed into X yet.");
+    console.log("  Run `npm run x-login` once, sign in, then start the bridge again.\n");
+    await context.close().catch(() => {});
+    process.exit(1);
+  }
   await attendant(page);
+}
+
+// One-time login: open X, sit still (no reload loop), and wait until the
+// user is signed in, then persist the session and exit.
+async function runLogin(page) {
+  console.log("\n  Opening X login. Sign in with ANY account (a burner is fine).");
+  console.log("  The hosts never log in — this browser only reads public chat.");
+  console.log("  Waiting for sign-in to complete...\n");
+  await page.goto("https://x.com/login", { waitUntil: "domcontentloaded" }).catch(() => {});
+  for (;;) {
+    await page.waitForTimeout(3000);
+    if (await isLoggedIn(page)) {
+      console.log("\n  Signed in. Session saved — you can close this window.");
+      console.log("  Start the bridge any time with `npm run x-live`.\n");
+      await page.waitForTimeout(1500);
+      await context.close().catch(() => {});
+      process.exit(0);
+    }
+  }
+}
+
+async function isLoggedIn(page) {
+  try {
+    const cookies = await context.cookies("https://x.com");
+    return cookies.some((cookie) => cookie.name === "auth_token" && cookie.value);
+  } catch {
+    return false;
+  }
 }
 
 // Set-and-forget mode: keep watching the profile, attach to each broadcast
@@ -180,29 +238,63 @@ function broadcastId(url) {
   return (String(url).match(/\/i\/broadcasts\/(\w+)/) || [])[1] || "";
 }
 
+// X live chat rides Periscope chat infra. Verified frame shape:
+//   {"kind":1,"payload":"{\"room\":..,\"body\":\"{\\\"body\\\":<text>,
+//    \\\"displayName\\\":<name>,\\\"type\\\":1,..}\"}"}
+// kind:1 = chat; kind:2 = presence/occupancy (skipped). The message lives
+// two JSON-string unwraps deep: frame.payload -> .body -> {body, displayName}.
 function handlePayload(payload) {
   if (!payload.includes("{")) return;
-  let parsed;
+  let frame;
   try {
-    parsed = JSON.parse(payload);
+    frame = JSON.parse(payload);
   } catch {
     return;
   }
-  for (const candidate of walkChatCandidates(parsed, 0)) {
-    emit(candidate);
+
+  const message = parsePeriscopeChat(frame);
+  if (message) {
+    emit(message);
+  } else {
+    // Fallback for any unseen variant: deep-walk for {body, displayName}.
+    for (const candidate of walkChatCandidates(frame, 0)) emit(candidate);
   }
-  if (args.debug && !payload.includes("ping")) {
-    console.log(`[frame] ${payload.slice(0, 240)}`);
+
+  if (args.debug && frame.kind === 1) {
+    console.log(`[frame] ${payload.slice(0, 200)}`);
   }
 }
 
-// Periscope-style chat frames nest JSON strings inside `payload`/`body`
-// several levels deep; unwrap and look for {body, username|displayName}.
+function parsePeriscopeChat(frame) {
+  if (!frame || frame.kind !== 1) return null;
+  const inner = parseMaybe(frame.payload);
+  if (!inner) return null;
+  const message = parseMaybe(inner.body);
+  if (!message || typeof message.body !== "string") return null;
+  // type 1 is a chat message; other types are control/presence events.
+  if (message.type !== undefined && message.type !== 1) return null;
+  const text = message.body.trim();
+  if (!text) return null;
+  const name = String(message.displayName || message.username || "X viewer");
+  return { author: name, displayName: name, text };
+}
+
+function parseMaybe(value) {
+  if (value && typeof value === "object") return value;
+  if (typeof value !== "string") return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+// Fallback only: nest JSON strings several levels deep; find {body, name}.
 function* walkChatCandidates(node, depth) {
   if (depth > 6 || !node || typeof node !== "object") return;
 
   const body = node.body;
-  if (typeof body === "string" && (node.username || node.displayName || node.user_id)) {
+  if (typeof body === "string" && (node.username || node.displayName)) {
     const text = body.trim();
     if (text) {
       yield {
@@ -307,6 +399,7 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const key = argv[i];
     if (key === "--debug") parsed.debug = true;
+    else if (key === "--login") parsed.login = true;
     else if (key.startsWith("--")) parsed[key.slice(2)] = argv[++i];
   }
   return parsed;

@@ -136,14 +136,25 @@ https://your-tunnel.trycloudflare.com/api/kick/webhook
 
 ## X Live Chat Bridge (optional)
 
-X exposes no API for the chat inside a live broadcast. For shows that want
-it anyway, `npm run x-live` runs a set-and-forget bridge on one PC: it opens
-a real browser, watches the configured X account, attaches to each broadcast
-as it goes live, and relays chat into the feed with the host's tag. Configure
-it in `.local/x-live.config` (see `.env.example` for the `X_LIVE_*` keys),
-log into X once in the window it opens, and optionally drop a shortcut to
-`scripts\x-live-forever.bat` into `shell:startup` so it survives reboots and
-crashes. This is a power feature — the normal flow above never needs it.
+X exposes no API for the chat inside a live broadcast, so the bridge reads
+it from a real signed-in browser (X live chat rides Periscope chat infra;
+the parser is calibrated to that frame format). The streamers never log in —
+the bridge only reads the public chat every viewer sees, and its browser
+just needs *some* X session (a burner works).
+
+Setup on one PC:
+
+1. `npm run x-login` once — sign into any X account, close the window. The
+   session persists in `.local/x-chat-profile`.
+2. Configure `.local/x-live.config` (see `.env.example` for the `X_LIVE_*`
+   keys), or copy the ready-made command from the dashboard's X Live Chat
+   panel.
+3. `npm run x-live` — it watches the configured account, attaches to each
+   broadcast as it goes live, and relays chat tagged with the host's color.
+
+Optionally drop a shortcut to `scripts\x-live-forever.bat` into
+`shell:startup` so it survives reboots and crashes. This is a power feature —
+the normal watcher flow never needs it.
 
 ## API
 

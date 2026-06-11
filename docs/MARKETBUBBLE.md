@@ -72,9 +72,13 @@ Two things to know:
   chat, the same one every viewer sees. Its browser just needs to be signed
   into *some* X account because X blocks logged-out browsing — a burner or
   the show's utility account is perfect.
-- The exact command is generated for you: open the dashboard's
+- One-time on the show PC: run `npm run x-login` once, sign the browser
+  into any X account (a burner is perfect), close the window. That session
+  is saved permanently.
+- Then the exact run command is generated for you: open the dashboard's
   **X Live Chat** panel (bottom-left) and press **Copy** next to the host.
-  Paste it into a terminal in the project folder and leave it running.
+  Paste it into a terminal in the project folder and leave it running — it
+  attaches to each broadcast automatically and relays the live chat.
 
 @bitcoinaqua can set this up on the show PC in a few minutes if you'd
 rather not touch it.
