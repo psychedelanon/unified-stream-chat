@@ -44,4 +44,4 @@ The Sproto layout script creates or updates the `Unified Chat Feed` browser sour
 2. Open `http://127.0.0.1:8787/overlay`.
 3. Open `http://127.0.0.1:8787/overlay?layout=rail&position=right&messages=5`.
 4. Show BITCOINAQUA Sproto control/overlay using the standalone rail URL.
-5. Mention that the same standalone product can be reused by any streamer by changing the Twitch channel, X query, Kick webhook subscription, and OBS overlay shape.
+5. Mention that the same standalone product works for any show by adding chat watchers (streamer name + their channels) — no login from the streamers — and dropping the chat-box overlay into OBS.
