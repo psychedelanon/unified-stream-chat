@@ -7,25 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      // Layer Tailwind onto the existing design system without resetting it.
-      tailwind.config = {
-        corePlugins: { preflight: false },
-        theme: {
-          extend: {
-            colors: {
-              ink: "#060607",
-              surface: "#141417",
-              line: "rgba(255,255,255,0.08)",
-              muted: "#9a9aa2",
-              faint: "#66666e",
-            },
-            fontFamily: { sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"] },
-          },
-        },
-      };
-    </script>
+    <link rel="stylesheet" href="/tailwind.css" />
     <link rel="stylesheet" href="/app.css" />
   </head>
   <body>
