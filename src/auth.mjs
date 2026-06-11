@@ -211,7 +211,8 @@ export async function stampIdentities(messages, env = process.env) {
         : `${message.author} ${message.channel}`
       ).toLowerCase();
       const matches = rules.filter((rule) => rule.terms.some((term) => haystack.includes(term)));
-      if (matches.length !== 1) return message;
+      const labels = new Set(matches.map((rule) => rule.label));
+      if (labels.size !== 1) return message;
       return { ...message, identityLabel: matches[0].label, identityColor: matches[0].color };
     });
   } catch {
