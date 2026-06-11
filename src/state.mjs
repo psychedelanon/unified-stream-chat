@@ -259,9 +259,10 @@ function statsFor(messages) {
 }
 
 async function readStored(env, key) {
-  if (!hasUpstash(env)) return null;
-  const response = await fetch(`${env.UPSTASH_REDIS_REST_URL}/get/${encodeURIComponent(key)}`, {
-    headers: { authorization: `Bearer ${env.UPSTASH_REDIS_REST_TOKEN}` },
+  const redis = upstashConfig(env);
+  if (!redis) return null;
+  const response = await fetch(`${redis.url}/get/${encodeURIComponent(key)}`, {
+    headers: { authorization: `Bearer ${redis.token}` },
   });
   if (!response.ok) return null;
   const payload = await response.json().catch(() => ({}));
@@ -270,11 +271,12 @@ async function readStored(env, key) {
 }
 
 async function writeStored(env, key, value) {
-  if (!hasUpstash(env)) return;
-  await fetch(`${env.UPSTASH_REDIS_REST_URL}/set/${encodeURIComponent(key)}`, {
+  const redis = upstashConfig(env);
+  if (!redis) return;
+  await fetch(`${redis.url}/set/${encodeURIComponent(key)}`, {
     method: "POST",
     headers: {
-      authorization: `Bearer ${env.UPSTASH_REDIS_REST_TOKEN}`,
+      authorization: `Bearer ${redis.token}`,
       "content-type": "application/json",
     },
     body: JSON.stringify(value),
@@ -282,7 +284,13 @@ async function writeStored(env, key, value) {
 }
 
 function hasUpstash(env) {
-  return Boolean(env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN);
+  return Boolean(upstashConfig(env));
+}
+
+export function upstashConfig(env = process.env) {
+  const url = String(env.UPSTASH_REDIS_REST_URL || env.KV_REST_API_URL || "").trim();
+  const token = String(env.UPSTASH_REDIS_REST_TOKEN || env.KV_REST_API_TOKEN || "").trim();
+  return url && token ? { url, token } : null;
 }
 
 function normalizeSource(source) {

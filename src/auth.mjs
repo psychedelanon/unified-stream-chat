@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { upstashConfig } from "./state.mjs";
 
 const STATE_TTL_MS = 10 * 60 * 1000;
 const RULES_CACHE_MS = 30 * 1000;
@@ -119,9 +120,10 @@ export function connectionsStore(env = process.env) {
 
   return {
     async read() {
-      if (hasUpstash(env)) {
-        const response = await fetch(`${env.UPSTASH_REDIS_REST_URL}/get/${encodeURIComponent(key)}`, {
-          headers: { authorization: `Bearer ${env.UPSTASH_REDIS_REST_TOKEN}` },
+      const redis = upstashConfig(env);
+      if (redis) {
+        const response = await fetch(`${redis.url}/get/${encodeURIComponent(key)}`, {
+          headers: { authorization: `Bearer ${redis.token}` },
         });
         if (response.ok) {
           const payload = await response.json().catch(() => ({}));
@@ -136,11 +138,12 @@ export function connectionsStore(env = process.env) {
     },
 
     async write(doc) {
-      if (hasUpstash(env)) {
-        await fetch(`${env.UPSTASH_REDIS_REST_URL}/set/${encodeURIComponent(key)}`, {
+      const redis = upstashConfig(env);
+      if (redis) {
+        await fetch(`${redis.url}/set/${encodeURIComponent(key)}`, {
           method: "POST",
           headers: {
-            authorization: `Bearer ${env.UPSTASH_REDIS_REST_TOKEN}`,
+            authorization: `Bearer ${redis.token}`,
             "content-type": "application/json",
           },
           body: JSON.stringify(doc),
@@ -426,10 +429,6 @@ function open(blob, secret) {
 
 function memoryDoc() {
   return (globalThis.__uscConnections ||= { rooms: {} });
-}
-
-function hasUpstash(env) {
-  return Boolean(env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN);
 }
 
 function parseCookie(header, name) {
