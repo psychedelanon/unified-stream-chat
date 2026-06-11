@@ -31,9 +31,7 @@ const els = {
   newHostTwitch: document.getElementById("newHostTwitch"),
   newHostKick: document.getElementById("newHostKick"),
   newHostColor: document.getElementById("newHostColor"),
-  twitchChannel: document.getElementById("twitchChannel"),
-  xQuery: document.getElementById("xQuery"),
-  kickWebhook: document.getElementById("kickWebhook"),
+  xLiveCommands: document.getElementById("xLiveCommands"),
   adminToken: document.getElementById("adminToken"),
   dashboardUrl: document.getElementById("dashboardUrl"),
   obsUrl: document.getElementById("obsUrl"),
@@ -73,20 +71,16 @@ const state = {
   joinedTwitchChannels: [],
   serverConfig: null,
   xAutoStarted: false,
+  xQuery: "",
 };
 
 const origin = window.location.origin;
 const defaults = {
-  twitchChannel: params.get("twitch") || localStorage.getItem("unifiedStreamChat.twitchChannel") || "bitcoinaqua",
-  xQuery: params.get("x") || localStorage.getItem("unifiedStreamChat.xQuery") || "(@bitcoinaqua OR from:bitcoinaqua OR #bitcoinaqua) -is:retweet",
   adminToken: localStorage.getItem("unifiedStreamChat.adminToken") || "",
 };
 
 setValue(els.roomName, roomName);
-setValue(els.twitchChannel, defaults.twitchChannel);
-setValue(els.xQuery, defaults.xQuery);
 setValue(els.adminToken, defaults.adminToken);
-setValue(els.kickWebhook, `${origin}/api/kick/webhook`);
 setValue(els.dashboardUrl, `${origin}/`);
 setValue(els.obsUrl, `${origin}/overlay`);
 setValue(els.obsRightRailUrl, `${origin}/overlay?layout=rail&position=right&messages=5`);
@@ -108,9 +102,9 @@ handleAuthReturn();
 function bindDashboard() {
   if (isOverlay) return;
 
-  document.getElementById("connectTwitch")?.addEventListener("click", () => connectTwitch());
   document.getElementById("addHost")?.addEventListener("click", addHost);
   els.hostList?.addEventListener("click", onWatcherChipClick);
+  els.xLiveCommands?.addEventListener("click", onCopyXLiveCommand);
   els.newHostName?.addEventListener("keydown", (event) => {
     if (event.key === "Enter") addHost();
   });
@@ -119,12 +113,6 @@ function bindDashboard() {
     state.localHosts = readLocalHosts(currentRoom());
     refreshConnections();
   });
-  els.xQuery?.addEventListener("change", () => {
-    localStorage.setItem("unifiedStreamChat.xQueryCustom", "1");
-  });
-  document.getElementById("syncX")?.addEventListener("click", syncX);
-  document.getElementById("autoX")?.addEventListener("click", toggleAutoX);
-  document.getElementById("copyKickWebhook")?.addEventListener("click", copyKickWebhook);
   document.getElementById("demoPulse")?.addEventListener("click", toggleDemoPulse);
   document.getElementById("demoAll")?.addEventListener("click", seedAll);
   document.getElementById("demoTwitch")?.addEventListener("click", () => injectDemo("twitch"));
@@ -147,8 +135,9 @@ function bindDashboard() {
     });
   });
 
-  [els.twitchChannel, els.xQuery, els.adminToken].forEach((input) => {
-    input?.addEventListener("change", persistInputs);
+  els.adminToken?.addEventListener("change", () => {
+    persistInputs();
+    renderXLiveCommands();
   });
 }
 
@@ -289,13 +278,16 @@ function renderOverlayPlaceholder() {
   `;
 }
 
-async function connectTwitch(extraChannels = []) {
-  const channels = Array.from(new Set([
-    ...String(els.twitchChannel.value || "").split(",").map(cleanChannel),
-    ...extraChannels.map(cleanChannel),
-  ].filter(Boolean)));
-  if (!channels.length) return;
-  persistInputs();
+async function connectTwitch(watchChannels = []) {
+  const channels = Array.from(new Set(watchChannels.map(cleanChannel).filter(Boolean)));
+  if (!channels.length) {
+    if (state.twitchSocket) {
+      state.twitchSocket.close();
+      state.twitchSocket = null;
+      setSourceStatus("twitch", "idle", "idle");
+    }
+    return;
+  }
 
   if (state.twitchSocket) {
     state.twitchSocket.close();
@@ -502,15 +494,66 @@ function autoWireSources() {
     .filter((host) => host.connections?.x?.enabled !== false)
     .map((host) => String(host.connections?.x?.username || "").trim())
     .filter(Boolean);
-  if (xHandles.length && !localStorage.getItem("unifiedStreamChat.xQueryCustom")) {
-    const query = `(${xHandles.map((handle) => `to:${handle} OR @${handle}`).join(" OR ")}) -is:retweet`;
-    if (els.xQuery && els.xQuery.value !== query) setValue(els.xQuery, query);
-  }
+  state.xQuery = xHandles.length
+    ? `(${xHandles.map((handle) => `to:${handle} OR @${handle}`).join(" OR ")}) -is:retweet`
+    : "";
 
   // X polling starts itself once a watched handle exists; no clicks needed.
   if (xHandles.length && state.serverConfig?.xEnabled && !state.xTimer && !state.xAutoStarted) {
     state.xAutoStarted = true;
-    toggleAutoX();
+    syncX();
+    state.xTimer = setInterval(syncX, 25000);
+  }
+  if (!xHandles.length && state.xTimer) {
+    clearInterval(state.xTimer);
+    state.xTimer = null;
+    state.xAutoStarted = false;
+    setSourceStatus("x", "idle", "idle");
+  }
+
+  renderXLiveCommands();
+}
+
+function renderXLiveCommands() {
+  if (!els.xLiveCommands) return;
+  const hosts = state.connections.filter((host) => host.connections?.x?.username && host.connections.x.enabled !== false);
+  if (!hosts.length) {
+    els.xLiveCommands.innerHTML = `<p class="note">Add a watcher with an X handle to generate its command.</p>`;
+    return;
+  }
+  els.xLiveCommands.innerHTML = hosts.map((host) => `
+    <div class="xlive-row">
+      <code class="xlive-cmd">${escapeHtml(xLiveCommandFor(host))}</code>
+      <button type="button" data-copy-xlive="${escapeAttr(host.profile)}">Copy</button>
+    </div>
+  `).join("");
+}
+
+function xLiveCommandFor(host) {
+  const handle = String(host.connections?.x?.username || "").replace(/^@/, "");
+  const token = els.adminToken?.value?.trim();
+  const parts = [
+    "npm run x-live --",
+    `--user ${handle}`,
+    `--label "${host.label}"`,
+  ];
+  if (host.color) parts.push(`--color "${host.color}"`);
+  parts.push(`--ingest ${origin}`);
+  if (token) parts.push(`--token ${token}`);
+  return parts.join(" ");
+}
+
+async function onCopyXLiveCommand(event) {
+  const button = event.target.closest("button[data-copy-xlive]");
+  if (!button) return;
+  const host = state.connections.find((candidate) => candidate.profile === button.dataset.copyXlive);
+  if (!host) return;
+  try {
+    await navigator.clipboard.writeText(xLiveCommandFor(host));
+    button.textContent = "Copied";
+    setTimeout(() => { button.textContent = "Copy"; }, 1500);
+  } catch {
+    button.textContent = "Select + copy manually";
   }
 }
 
@@ -556,9 +599,8 @@ function cleanSlug(value) {
 
 async function syncX() {
   if (state.xSyncInFlight) return;
-  const query = els.xQuery.value.trim();
+  const query = state.xQuery.trim();
   if (!query) return;
-  persistInputs();
   state.xSyncInFlight = true;
   setSourceStatus("x", "warn", "syncing");
 
@@ -587,32 +629,6 @@ async function syncX() {
     showError(error.message || "X sync failed.");
   } finally {
     state.xSyncInFlight = false;
-  }
-}
-
-function toggleAutoX() {
-  const button = document.getElementById("autoX");
-  if (state.xTimer) {
-    clearInterval(state.xTimer);
-    state.xTimer = null;
-    button?.setAttribute("aria-pressed", "false");
-    if (button) button.textContent = "Auto X";
-    if (sourceStatus.x?.state === "warn") setSourceStatus("x", "idle", "idle");
-    return;
-  }
-  button?.setAttribute("aria-pressed", "true");
-  if (button) button.textContent = "X Auto On";
-  syncX();
-  state.xTimer = setInterval(syncX, 25000);
-}
-
-async function copyKickWebhook() {
-  try {
-    await navigator.clipboard.writeText(els.kickWebhook.value);
-    setSourceStatus("kick", "live", "copied");
-  } catch {
-    els.kickWebhook.select();
-    setSourceStatus("kick", "warn", "select");
   }
 }
 
@@ -659,12 +675,13 @@ function injectDemo(source) {
   };
   const list = samples[source] || samples.twitch;
   const author = source === "x" ? "@stream_signal" : source === "kick" ? "kickviewer" : "twitchviewer";
+  const firstWatched = state.connections[0]?.connections?.[source]?.channel || "demo";
   ingestMessage({
     source,
     id: `demo-${source}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
     author,
     displayName: author,
-    channel: source === "x" ? els.xQuery.value : cleanChannel(els.twitchChannel.value || "bitcoinaqua"),
+    channel: firstWatched,
     text: list[Math.floor(Math.random() * list.length)],
     createdAt: new Date().toISOString(),
   });
@@ -759,8 +776,6 @@ function normalizeLocalMessage(message) {
 }
 
 function persistInputs() {
-  localStorage.setItem("unifiedStreamChat.twitchChannel", cleanChannel(els.twitchChannel?.value || ""));
-  localStorage.setItem("unifiedStreamChat.xQuery", els.xQuery?.value || "");
   localStorage.setItem("unifiedStreamChat.adminToken", els.adminToken?.value || "");
 }
 

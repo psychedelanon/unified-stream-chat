@@ -62,12 +62,22 @@ platform on or off (dim + struck-through = off).
 ## Optional power feature: true X live chat
 
 X's live-broadcast chat is not available to any app through X's official
-APIs. For shows that want it anyway, the repo ships a bridge that runs on
-one PC, watches the show's X account in a real browser, and relays the live
-chat into the feed automatically. This is a technical setup (Node.js + a
-one-time X login) — it is not needed for the normal flow above. See the
-"X live chat bridge" section of the repo README if you want it; @bitcoinaqua
-can set it up for you.
+APIs. For shows that want it anyway, a small helper runs on one PC (the
+streaming/OBS machine is perfect) and relays the live chat into the feed
+automatically — it attaches itself every time the host goes live.
+
+Two things to know:
+
+- **The hosts never log into anything.** The helper reads the public live
+  chat, the same one every viewer sees. Its browser just needs to be signed
+  into *some* X account because X blocks logged-out browsing — a burner or
+  the show's utility account is perfect.
+- The exact command is generated for you: open the dashboard's
+  **X Live Chat** panel (bottom-left) and press **Copy** next to the host.
+  Paste it into a terminal in the project folder and leave it running.
+
+@bitcoinaqua can set this up on the show PC in a few minutes if you'd
+rather not touch it.
 
 ## Support
 

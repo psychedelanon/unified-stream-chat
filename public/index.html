@@ -83,27 +83,9 @@
             </section>
 
             <details class="panel-section advanced">
-              <summary>Advanced</summary>
-              <label>
-                Twitch channel (manual)
-                <input id="twitchChannel" name="twitchChannel" autocomplete="off" spellcheck="false" placeholder="streamer" />
-              </label>
-              <button id="connectTwitch" type="button">Connect Twitch</button>
-
-              <label>
-                X search query
-                <input id="xQuery" name="xQuery" autocomplete="off" spellcheck="false" placeholder="@streamer OR #hashtag" />
-              </label>
-              <div class="split-buttons">
-                <button id="syncX" type="button">Sync X</button>
-                <button id="autoX" type="button" aria-pressed="false">Auto X</button>
-              </div>
-
-              <label>
-                Kick webhook URL
-                <input id="kickWebhook" name="kickWebhook" readonly />
-              </label>
-              <button id="copyKickWebhook" type="button">Copy Webhook</button>
+              <summary>X Live Chat (power feature)</summary>
+              <p class="note">X has no API for live-broadcast chat, so a small helper runs on the streaming PC and relays it here. Sign its browser into <strong>any</strong> X account — a burner works; hosts never log in. One copy-paste per host, run from the project folder:</p>
+              <div id="xLiveCommands"><p class="note">Add a watcher with an X handle to generate its command.</p></div>
             </details>
           </aside>
 
