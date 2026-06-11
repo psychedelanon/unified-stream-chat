@@ -559,7 +559,10 @@ async function syncX() {
   if (state.xNewestId) url.searchParams.set("since_id", state.xNewestId);
 
   try {
-    const response = await fetch(url, { cache: "no-store" });
+    const headers = {};
+    const token = els.adminToken?.value?.trim();
+    if (token) headers.authorization = `Bearer ${token}`;
+    const response = await fetch(url, { cache: "no-store", headers });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || `X returned ${response.status}`);
     if (payload.meta?.newest_id) {

@@ -153,7 +153,8 @@ async function xRecent(request, response, url) {
     maxResults: url.searchParams.get("max_results"),
   }, process.env);
   result.messages = await stampIdentities(result.messages, process.env);
-  const state = url.searchParams.get("sync") === "0" ? null : await store.add(result.messages, { source: "x" });
+  const wantSync = url.searchParams.get("sync") !== "0" && isAuthorized(request.headers, process.env);
+  const state = wantSync ? await store.add(result.messages, { source: "x" }) : null;
   if (state) broadcast({ type: "state", state });
   return json(response, { ...result, state });
 }
