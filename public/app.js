@@ -54,8 +54,10 @@ const sourceStatus = {
   kick: { state: "warn", text: "webhook" },
 };
 
+localStorage.removeItem(localMessageKey);
+
 const state = {
-  messages: readLocalMessages(),
+  messages: [],
   filter: "all",
   loaded: false,
   paused: false,
@@ -196,8 +198,7 @@ function hideTransientStates() {
 function mergeMessages(messages) {
   const map = new Map(state.messages.map((message) => [message.id, message]));
   for (const message of messages) map.set(message.id, normalizeLocalMessage(message));
-  state.messages = Array.from(map.values()).sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
-  writeLocalMessages(state.messages);
+  state.messages = Array.from(map.values()).sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)).slice(-240);
 }
 
 function updateStats() {
@@ -682,7 +683,6 @@ async function clearFeed() {
     const response = await fetch("/api/messages", { method: "DELETE", headers });
     if (!response.ok) throw new Error(`clear returned ${response.status}`);
     state.messages = [];
-    writeLocalMessages([]);
     updateStats();
     render();
   } catch (error) {
@@ -743,21 +743,6 @@ function persistInputs() {
   localStorage.setItem("unifiedStreamChat.twitchChannel", cleanChannel(els.twitchChannel?.value || ""));
   localStorage.setItem("unifiedStreamChat.xQuery", els.xQuery?.value || "");
   localStorage.setItem("unifiedStreamChat.adminToken", els.adminToken?.value || "");
-}
-
-function readLocalMessages() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(localMessageKey) || "[]");
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeLocalMessages(messages) {
-  try {
-    localStorage.setItem(localMessageKey, JSON.stringify(messages.slice(-240)));
-  } catch {}
 }
 
 function statsFromMessages(messages) {
