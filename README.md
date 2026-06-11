@@ -4,6 +4,22 @@ Unified Stream Chat is a production-ready multi-platform chat layer for streamer
 
 This is the standalone contest product. The BITCOINAQUA Sproto stream uses it as one integration example, but any streamer can run it for their own show.
 
+Live demo: <https://unified-stream-chat.vercel.app>
+
+## Screenshots
+
+Dashboard with the unified, source-labeled feed:
+
+![Dashboard with unified Twitch + X + Kick feed](docs/images/dashboard.png)
+
+Transparent OBS lower-third overlay:
+
+![OBS lower-third overlay](docs/images/overlay-lower-third.png)
+
+Vertical side rail for broadcast layouts that already use a lower third:
+
+![OBS vertical rail overlay](docs/images/overlay-rail.png)
+
 ## Features
 
 - Twitch chat through the official IRC WebSocket.
@@ -21,7 +37,8 @@ This is the standalone contest product. The BITCOINAQUA Sproto stream uses it as
 ## Quick Start
 
 ```powershell
-cd C:\Users\mgmay\Code\unified-stream-chat
+git clone https://github.com/psychedelanon/unified-stream-chat.git
+cd unified-stream-chat
 npm install
 npm run setup
 npm run dev
