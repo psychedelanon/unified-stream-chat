@@ -493,7 +493,7 @@ async function addHost() {
   } finally {
     if (button) {
       button.disabled = false;
-      button.textContent = "Add Host";
+      button.textContent = "Add Watcher";
     }
   }
 }

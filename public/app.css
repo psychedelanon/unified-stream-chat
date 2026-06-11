@@ -810,8 +810,14 @@ body[data-overlay-layout="compact"] .overlay-message p {
 
 /* Box layout: a clean standalone chat panel that fills the browser source.
    Point an OBS browser source at /overlay?layout=box and size it to taste. */
+body[data-overlay-layout="box"].is-overlay {
+  width: 100%;
+  height: 100vh;
+  min-height: 0;
+}
+
 body[data-overlay-layout="box"].is-overlay .overlay {
-  width: 100vw;
+  width: 100%;
   height: 100vh;
   overflow: hidden;
 }
