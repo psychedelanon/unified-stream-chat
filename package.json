@@ -12,7 +12,8 @@
     "seed": "node scripts/seed-demo.mjs",
     "verify": "node scripts/verify.mjs",
     "smoke:live": "node scripts/smoke-live.mjs",
-    "check": "node --check src/env.mjs && node --check src/server.mjs && node --check src/state.mjs && node --check src/auth.mjs && node --check public/app.js && node --check api/stream.js && node --check scripts/setup.mjs && node --check scripts/doctor.mjs && node --check scripts/seed-demo.mjs && node --check scripts/verify.mjs && node --check scripts/smoke-live.mjs"
+    "x-live": "node scripts/x-live-chat-bridge.mjs",
+    "check": "node --check src/env.mjs && node --check src/server.mjs && node --check src/state.mjs && node --check src/auth.mjs && node --check public/app.js && node --check api/stream.js && node --check scripts/setup.mjs && node --check scripts/doctor.mjs && node --check scripts/seed-demo.mjs && node --check scripts/verify.mjs && node --check scripts/smoke-live.mjs && node --check scripts/x-live-chat-bridge.mjs"
   },
   "engines": {
     "node": ">=20"
