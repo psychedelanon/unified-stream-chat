@@ -392,6 +392,33 @@ h1 {
   overflow-wrap: anywhere;
 }
 
+.identity-tag,
+.overlay-identity-tag {
+  --identity-color: var(--accent);
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--identity-color), white 18%);
+  background: color-mix(in srgb, var(--identity-color), transparent 74%);
+  color: color-mix(in srgb, var(--identity-color), white 34%);
+  font-size: 11px;
+  font-weight: 950;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.identity-tag {
+  min-height: 20px;
+  padding: 0 7px;
+}
+
+.overlay-identity-tag {
+  min-height: 18px;
+  margin-left: 8px;
+  padding: 0 6px;
+  vertical-align: 1px;
+  font-size: 10px;
+}
+
 .message-text {
   margin-top: 5px;
   color: #f5f0df;

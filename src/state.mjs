@@ -114,6 +114,8 @@ export function normalizeMessage(input, sourceHint = "") {
     platformId,
     avatarUrl: clean(input.avatarUrl || input.avatar || ""),
     url: clean(input.url || input.permalink || ""),
+    identityLabel: clean(input.identityLabel || input.tag || input.speaker || input.guest || ""),
+    identityColor: cleanColor(input.identityColor || input.tagColor || input.color || ""),
     badges: Array.isArray(input.badges) ? input.badges.slice(0, 12) : [],
     metrics: input.metrics && typeof input.metrics === "object" ? input.metrics : {},
   };
@@ -292,6 +294,11 @@ function sourceLabel(source) {
 
 function clean(value) {
   return String(value ?? "").replace(/\s+/g, " ").trim();
+}
+
+function cleanColor(value) {
+  const color = clean(value);
+  return /^#[0-9a-f]{6}$/i.test(color) ? color : "";
 }
 
 function safeIso(value) {

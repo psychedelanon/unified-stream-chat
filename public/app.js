@@ -3,6 +3,7 @@ const isOverlay = location.pathname.includes("/overlay") || params.get("overlay"
 const app = document.getElementById("app");
 const localMessageKey = "unifiedStreamChat.messages";
 const overlayOptions = readOverlayOptions();
+const identityRules = readIdentityRules();
 
 document.body.classList.toggle("is-overlay", isOverlay);
 document.body.dataset.overlayLayout = overlayOptions.layout;
@@ -213,12 +214,14 @@ function renderStatuses() {
 }
 
 function renderMessage(message) {
+  const identityTag = renderIdentityTag(message);
   return `
     <li class="message ${escapeAttr(message.source)}">
       <span class="source-label">${escapeHtml(labelFor(message.source))}</span>
       <div class="message-main">
         <div class="message-meta">
           <strong class="message-author">${escapeHtml(message.displayName || message.author)}</strong>
+          ${identityTag}
           <span class="message-channel">${escapeHtml(message.channel || "")}</span>
         </div>
         <p class="message-text">${linkify(message.text)}</p>
@@ -229,11 +232,12 @@ function renderMessage(message) {
 }
 
 function renderOverlayMessage(message) {
+  const identityTag = renderIdentityTag(message, "overlay-identity-tag");
   return `
     <li class="overlay-message ${escapeAttr(message.source)}">
       <span class="source-label">${escapeHtml(labelFor(message.source))}</span>
       <div>
-        <strong>${escapeHtml(message.displayName || message.author)}</strong>
+        <strong>${escapeHtml(message.displayName || message.author)}${identityTag}</strong>
         <p>${escapeHtml(message.text)}</p>
       </div>
     </li>
@@ -472,7 +476,7 @@ function parseTwitchLine(line, fallbackChannel) {
 function normalizeLocalMessage(message) {
   const source = message.source || "twitch";
   const createdAt = message.createdAt || new Date().toISOString();
-  return {
+  const normalized = {
     id: message.id?.startsWith(`${source}:`) ? message.id : `${source}:${message.id || Date.now()}`,
     source,
     sourceLabel: labelFor(source),
@@ -483,7 +487,10 @@ function normalizeLocalMessage(message) {
     createdAt,
     receivedAt: message.receivedAt || new Date().toISOString(),
     url: message.url || "",
+    identityLabel: message.identityLabel || message.tag || message.speaker || message.guest || "",
+    identityColor: cleanColor(message.identityColor || message.tagColor || message.color || ""),
   };
+  return applyIdentityRule(normalized);
 }
 
 function persistInputs() {
@@ -531,6 +538,37 @@ function labelFor(source) {
   return source.charAt(0).toUpperCase() + source.slice(1);
 }
 
+function renderIdentityTag(message, className = "identity-tag") {
+  if (!message.identityLabel) return "";
+  const style = message.identityColor ? ` style="--identity-color: ${escapeAttr(message.identityColor)}"` : "";
+  return `<span class="${className}"${style}>${escapeHtml(message.identityLabel)}</span>`;
+}
+
+function readIdentityRules() {
+  return params.getAll("tag").map((raw) => {
+    const parts = String(raw || "").split("|").map((part) => part.trim());
+    const label = parts[0] || "";
+    const color = cleanColor(parts[1] || "");
+    const terms = String(parts[2] || label)
+      .split(",")
+      .map((term) => term.trim().replace(/^[@#]/, "").toLowerCase())
+      .filter(Boolean);
+    return label && terms.length ? { label, color, terms } : null;
+  }).filter(Boolean).slice(0, 12);
+}
+
+function applyIdentityRule(message) {
+  if (message.identityLabel || !identityRules.length) return message;
+  const haystack = [message.author, message.displayName, message.channel, message.text].join(" ").toLowerCase();
+  const rule = identityRules.find((candidate) => candidate.terms.some((term) => haystack.includes(term)));
+  if (!rule) return message;
+  return {
+    ...message,
+    identityLabel: rule.label,
+    identityColor: rule.color,
+  };
+}
+
 function readOverlayOptions() {
   const layout = readEnum(params.get("layout"), ["lower", "rail", "compact"], "lower");
   const defaultLimit = layout === "rail" ? 5 : layout === "compact" ? 3 : 2;
@@ -558,6 +596,11 @@ function overlayMetaText(total) {
 
 function cleanChannel(value) {
   return String(value || "").trim().replace(/^[@#]/, "").toLowerCase();
+}
+
+function cleanColor(value) {
+  const color = String(value || "").trim();
+  return /^#[0-9a-f]{6}$/i.test(color) ? color : "";
 }
 
 function formatTime(value) {

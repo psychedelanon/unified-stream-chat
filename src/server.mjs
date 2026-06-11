@@ -57,23 +57,23 @@ const server = createServer(async (request, response) => {
     }
 
     if (request.method === "GET" && url.pathname === "/api/events") {
-      return sse(request, response);
+      return await sse(request, response);
     }
 
     if (request.method === "POST" && ["/api/messages", "/api/ingest"].includes(url.pathname)) {
-      return ingest(request, response);
+      return await ingest(request, response);
     }
 
     if (request.method === "DELETE" && url.pathname === "/api/messages") {
-      return clear(request, response);
+      return await clear(request, response);
     }
 
     if (request.method === "GET" && url.pathname === "/api/x/recent") {
-      return xRecent(request, response, url);
+      return await xRecent(request, response, url);
     }
 
     if (request.method === "POST" && url.pathname === "/api/kick/webhook") {
-      return kickWebhook(request, response);
+      return await kickWebhook(request, response);
     }
 
     return asset(request, response, url.pathname);

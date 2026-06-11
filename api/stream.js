@@ -47,19 +47,19 @@ export default async function handler(request, response) {
     }
 
     if (request.method === "POST" && ["/messages", "/ingest"].includes(route)) {
-      return ingest(request, response);
+      return await ingest(request, response);
     }
 
     if (request.method === "DELETE" && route === "/messages") {
-      return clear(request, response);
+      return await clear(request, response);
     }
 
     if (request.method === "GET" && route === "/x/recent") {
-      return xRecent(request, response);
+      return await xRecent(request, response);
     }
 
     if (request.method === "POST" && route === "/kick/webhook") {
-      return kickWebhook(request, response);
+      return await kickWebhook(request, response);
     }
 
     return json(response, { ok: false, error: "not found" }, 404);
