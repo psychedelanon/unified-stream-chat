@@ -12,6 +12,7 @@ import {
   verifyKickSignature,
 } from "./state.mjs";
 import {
+  addWatcherHost,
   connectionsStore,
   handleCallback,
   stampIdentities,
@@ -88,6 +89,13 @@ const server = createServer(async (request, response) => {
 
     if (request.method === "GET" && url.pathname === "/api/connections") {
       return json(response, await connectionsStore(process.env).publicRoom(url.searchParams.get("room") || ""));
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/hosts") {
+      if (!isAuthorized(request.headers, process.env)) {
+        return json(response, { ok: false, error: "unauthorized" }, 401);
+      }
+      return json(response, await addWatcherHost(await readJson(request), process.env));
     }
 
     if (request.method === "DELETE" && url.pathname === "/api/connections") {

@@ -454,6 +454,11 @@ h1 {
   color: #6ee7b7;
 }
 
+.connect-chip.connected.watch {
+  border-color: rgba(252, 211, 77, 0.5);
+  color: #fcd34d;
+}
+
 .host-add-row input[type="color"] {
   padding: 2px;
   min-width: 44px;

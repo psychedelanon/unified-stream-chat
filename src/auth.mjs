@@ -115,6 +115,121 @@ export async function handleCallback(platform, query = {}, cookieHeader = "", en
   };
 }
 
+export async function addWatcherHost(input = {}, env = process.env) {
+  const room = cleanSlug(input.room) || "default";
+  const label = clean(input.label).slice(0, 32);
+  const profile = cleanSlug(input.profile || label);
+  if (!profile) throw httpError(400, "label is required");
+  const color = cleanColor(input.color);
+  const store = connectionsStore(env);
+  const now = new Date().toISOString();
+  const results = {};
+
+  await store.saveHost(room, profile, { label: label || profile, color });
+
+  const xHandle = clean(input.x).replace(/^@/, "").slice(0, 32);
+  if (xHandle) {
+    await store.saveConnection(room, profile, {}, "x", {
+      platform: "x",
+      mode: "watch",
+      username: xHandle,
+      displayName: xHandle,
+      channel: xHandle,
+      connectedAt: now,
+    });
+    results.x = { ok: true, username: xHandle };
+  }
+
+  const twitchChannel = cleanSlug(clean(input.twitch).replace(/^[@#]/, ""));
+  if (twitchChannel) {
+    await store.saveConnection(room, profile, {}, "twitch", {
+      platform: "twitch",
+      mode: "watch",
+      username: twitchChannel,
+      displayName: twitchChannel,
+      channel: twitchChannel,
+      connectedAt: now,
+    });
+    results.twitch = { ok: true, channel: twitchChannel };
+  }
+
+  const kickSlug = cleanSlug(clean(input.kick).replace(/^[@#]/, ""));
+  if (kickSlug) {
+    const connection = {
+      platform: "kick",
+      mode: "watch",
+      username: kickSlug,
+      displayName: kickSlug,
+      channel: kickSlug,
+      connectedAt: now,
+    };
+    try {
+      const token = await kickAppToken(env);
+      const channel = await kickChannelBySlug(kickSlug, token);
+      connection.broadcasterUserId = Number(channel.broadcaster_user_id || 0);
+      connection.channel = String(channel.slug || kickSlug);
+      connection.subscription = await kickSubscribe(token, connection.broadcasterUserId);
+    } catch (error) {
+      connection.subscription = { ok: false, error: error?.message || "Kick watch setup failed" };
+    }
+    await store.saveConnection(room, profile, {}, "kick", connection);
+    results.kick = { ok: Boolean(connection.subscription?.ok), ...connection.subscription, channel: connection.channel };
+  }
+
+  invalidateRulesCache();
+  return { ok: true, room, profile, results };
+}
+
+let kickTokenCache = { token: "", expiresAt: 0 };
+
+async function kickAppToken(env) {
+  if (kickTokenCache.token && Date.now() < kickTokenCache.expiresAt - 60_000) return kickTokenCache.token;
+  const id = clientId("kick", env);
+  const secret = clientSecret("kick", env);
+  if (!id || !secret) throw httpError(503, "Kick watch needs KICK_CLIENT_ID and KICK_CLIENT_SECRET");
+  const response = await fetch("https://id.kick.com/oauth/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ grant_type: "client_credentials", client_id: id, client_secret: secret }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !payload.access_token) {
+    throw httpError(502, payload.error_description || `Kick app token failed (${response.status})`);
+  }
+  kickTokenCache = {
+    token: payload.access_token,
+    expiresAt: Date.now() + Number(payload.expires_in || 3600) * 1000,
+  };
+  return kickTokenCache.token;
+}
+
+async function kickChannelBySlug(slug, token) {
+  const payload = await apiGet(
+    `https://api.kick.com/public/v1/channels?slug=${encodeURIComponent(slug)}`,
+    { authorization: `Bearer ${token}` },
+    "Kick channel lookup",
+  );
+  const channel = payload.data?.[0];
+  if (!channel) throw httpError(404, `Kick channel "${slug}" not found`);
+  return channel;
+}
+
+async function kickSubscribe(token, broadcasterUserId) {
+  if (!broadcasterUserId) return { ok: false, error: "missing broadcaster id" };
+  const response = await fetch("https://api.kick.com/public/v1/events/subscriptions", {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({
+      broadcaster_user_id: broadcasterUserId,
+      events: [{ name: "chat.message.sent", version: 1 }],
+      method: "webhook",
+    }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) return { ok: false, error: payload.message || `Kick subscription failed (${response.status})` };
+  return { ok: true, events: ["chat.message.sent"] };
+}
+
 export function connectionsStore(env = process.env) {
   const key = env.STREAM_CHAT_CONNECTIONS_KEY || "unified-stream-chat:connections";
 
@@ -151,6 +266,16 @@ export function connectionsStore(env = process.env) {
         return;
       }
       globalThis.__uscConnections = doc;
+    },
+
+    async saveHost(room, profile, meta = {}) {
+      const doc = await this.read();
+      const roomDoc = (doc.rooms[room] ||= { hosts: {} });
+      const host = (roomDoc.hosts[profile] ||= { label: profile, color: "", connections: {} });
+      if (meta.label) host.label = meta.label;
+      if (meta.color) host.color = meta.color;
+      roomDoc.updatedAt = new Date().toISOString();
+      await this.write(doc);
     },
 
     async saveConnection(room, profile, meta = {}, platform, connection) {
@@ -357,6 +482,7 @@ async function apiGet(url, headers, label) {
 function publicConnection(connection = {}) {
   return {
     platform: connection.platform,
+    mode: connection.mode || "oauth",
     username: connection.username || "",
     displayName: connection.displayName || "",
     channel: connection.channel || "",

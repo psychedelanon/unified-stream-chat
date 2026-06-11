@@ -6,6 +6,7 @@ import {
   verifyKickSignature,
 } from "../src/state.mjs";
 import {
+  addWatcherHost,
   connectionsStore,
   handleCallback,
   stampIdentities,
@@ -74,6 +75,13 @@ export default async function handler(request, response) {
 
     if (request.method === "GET" && route === "/connections") {
       return json(response, await connectionsStore(process.env).publicRoom(queryValue(request.query.room)));
+    }
+
+    if (request.method === "POST" && route === "/hosts") {
+      if (!isAuthorized(request.headers, process.env)) {
+        return json(response, { ok: false, error: "unauthorized" }, 401);
+      }
+      return json(response, await addWatcherHost(await readJson(request), process.env));
     }
 
     if (request.method === "DELETE" && route === "/connections") {

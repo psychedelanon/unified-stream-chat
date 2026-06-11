@@ -27,6 +27,9 @@ const els = {
   roomName: document.getElementById("roomName"),
   hostList: document.getElementById("hostList"),
   newHostName: document.getElementById("newHostName"),
+  newHostX: document.getElementById("newHostX"),
+  newHostTwitch: document.getElementById("newHostTwitch"),
+  newHostKick: document.getElementById("newHostKick"),
   newHostColor: document.getElementById("newHostColor"),
   twitchChannel: document.getElementById("twitchChannel"),
   xQuery: document.getElementById("xQuery"),
@@ -369,7 +372,9 @@ function renderHostRow(host) {
     const connection = host.connections?.[platform];
     if (connection) {
       const handle = connection.username || connection.channel || "connected";
-      return `<span class="connect-chip connected ${platform}" title="${escapeAttr(`${labelFor(platform)}: ${handle}`)}">${escapeHtml(labelFor(platform))} &check;</span>`;
+      const isWatch = connection.mode === "watch";
+      const title = `${labelFor(platform)}: ${isWatch ? "watching " : ""}${handle}`;
+      return `<span class="connect-chip connected${isWatch ? " watch" : ""} ${platform}" title="${escapeAttr(title)}">${escapeHtml(labelFor(platform))} ${isWatch ? "&#9678;" : "&check;"}</span>`;
     }
     const href = `/api/auth/${platform}/start?room=${encodeURIComponent(currentRoom())}&profile=${encodeURIComponent(host.profile)}&label=${encodeURIComponent(host.label)}&color=${encodeURIComponent(host.color || "")}`;
     return `<a class="connect-chip ${platform}" href="${escapeAttr(href)}">${escapeHtml(labelFor(platform))} +</a>`;
@@ -384,18 +389,53 @@ function renderHostRow(host) {
   `;
 }
 
-function addHost() {
+async function addHost() {
   const name = String(els.newHostName?.value || "").trim().slice(0, 32);
   const profile = cleanSlug(name);
   if (!profile) return;
   const color = cleanColor(els.newHostColor?.value || "") || "#f97316";
-  state.localHosts = [
-    ...state.localHosts.filter((host) => host.profile !== profile),
-    { profile, label: name, color, connections: {} },
-  ];
-  writeLocalHosts();
-  if (els.newHostName) els.newHostName.value = "";
-  renderHosts();
+  const body = {
+    room: currentRoom(),
+    profile,
+    label: name,
+    color,
+    x: String(els.newHostX?.value || "").trim(),
+    twitch: String(els.newHostTwitch?.value || "").trim(),
+    kick: String(els.newHostKick?.value || "").trim(),
+  };
+
+  const button = document.getElementById("addHost");
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Adding";
+  }
+  try {
+    const headers = { "content-type": "application/json" };
+    const token = els.adminToken?.value?.trim();
+    if (token) headers.authorization = `Bearer ${token}`;
+    const response = await fetch("/api/hosts", { method: "POST", headers, body: JSON.stringify(body) });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.ok) throw new Error(payload.error || `hosts returned ${response.status}`);
+    [els.newHostName, els.newHostX, els.newHostTwitch, els.newHostKick].forEach((input) => {
+      if (input) input.value = "";
+    });
+    const kickResult = payload.results?.kick;
+    if (kickResult && !kickResult.ok) showError(`Kick watch issue: ${kickResult.error || "subscription failed"}`);
+    await refreshConnections();
+  } catch (error) {
+    showError(error.message || "Could not save host.");
+    state.localHosts = [
+      ...state.localHosts.filter((host) => host.profile !== profile),
+      { profile, label: name, color, connections: {} },
+    ];
+    writeLocalHosts();
+    renderHosts();
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Add Host";
+    }
+  }
 }
 
 function autoWireSources() {

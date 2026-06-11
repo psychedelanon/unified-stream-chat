@@ -51,11 +51,16 @@
                 Add host
                 <input id="newHostName" name="newHostName" autocomplete="off" spellcheck="false" placeholder="Ansem" />
               </label>
+              <div class="split-buttons three">
+                <input id="newHostX" name="newHostX" autocomplete="off" spellcheck="false" placeholder="@x" aria-label="X handle" />
+                <input id="newHostTwitch" name="newHostTwitch" autocomplete="off" spellcheck="false" placeholder="twitch" aria-label="Twitch channel" />
+                <input id="newHostKick" name="newHostKick" autocomplete="off" spellcheck="false" placeholder="kick" aria-label="Kick slug" />
+              </div>
               <div class="split-buttons host-add-row">
                 <input id="newHostColor" name="newHostColor" type="color" value="#f97316" aria-label="Host color" />
                 <button id="addHost" type="button">Add Host</button>
               </div>
-              <p class="note">Each host connects their own accounts once. Their chats land in this room tagged with their color.</p>
+              <p class="note">Handles are optional: watchers pull public chats with no action from the host. Connect chips upgrade a host to a verified account.</p>
             </section>
 
             <section class="panel-section">
