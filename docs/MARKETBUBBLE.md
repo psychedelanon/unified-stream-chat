@@ -35,9 +35,16 @@ platform on or off (dim + struck-through = off).
 - **Twitch**: keep one dashboard tab open anywhere — that tab relays Twitch
   chat for all watched channels. (A laptop running OBS with the dashboard
   open in a browser tab is enough.)
-- **X**: click **Auto X** once. It pulls posts that reply to or mention your
-  hosts every 25 seconds. Note: X does not allow any app to read the chat
-  inside an X live broadcast — mentions and replies are what X offers.
+- **X mentions**: click **Auto X** once. It pulls posts that reply to or
+  mention your hosts every 25 seconds. Note: X does not allow any app to
+  read the chat inside an X live broadcast through its API — mentions and
+  replies are all X offers officially.
+- **X live chat** (optional, runs on the operator's PC): the repo includes a
+  bridge that opens the live broadcast in a real browser and relays its chat
+  into the feed. With the config file in place (`.local/x-live.config`), run
+  `npm run x-live` before going live — it waits for the broadcast to start,
+  attaches, and tags messages automatically. First run asks you to log into
+  X in the window it opens; after that it remembers.
 - The OBS overlay updates by itself. Add it as a Browser Source at
   1920x1080; pick lower-third, rail, or compact via the URLs in the
   dashboard's OBS panel.

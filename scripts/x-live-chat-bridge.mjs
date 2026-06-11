@@ -5,29 +5,52 @@
 //   1. WebSocket frames (X live chat rides on Periscope-era chat infra)
 //   2. DOM fallback: new chat rows observed in the page
 //
-// Usage:
-//   node scripts/x-live-chat-bridge.mjs --url https://x.com/i/broadcasts/XXXX \
-//     [--ingest https://unified-stream-chat.vercel.app] [--token ADMIN_TOKEN] \
-//     [--label aqua] [--color #151df9] [--debug]
+// Usage (every flag can also live in .env as X_LIVE_*):
+//   node scripts/x-live-chat-bridge.mjs --user bitcoinaqua
+//   node scripts/x-live-chat-bridge.mjs --url https://x.com/i/broadcasts/XXXX
+//   extra flags: [--ingest https://...] [--token ADMIN_TOKEN]
+//                [--label aqua] [--color #151df9] [--debug]
 //
-// First run: log into X in the opened browser window; the session persists
-// in .local/x-chat-profile for next time.
+// With --user (or X_LIVE_USER in .env) the bridge watches the profile until
+// a live broadcast appears, then attaches — run `npm run x-live` before
+// going live and forget about it. First run: log into X in the opened
+// browser window; the session persists in .local/x-chat-profile.
 
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { loadEnv } from "../src/env.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const args = parseArgs(process.argv.slice(2));
+loadEnv(root);
+loadConfigFile(path.join(root, ".local", "x-live.config"));
 
-if (!args.url) {
-  console.error("Missing --url <X broadcast or live post URL>");
+function loadConfigFile(file) {
+  if (!existsSync(file)) return;
+  for (const line of readFileSync(file, "utf8").split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const index = trimmed.indexOf("=");
+    if (index === -1) continue;
+    const key = trimmed.slice(0, index).trim();
+    if (process.env[key] === undefined) process.env[key] = trimmed.slice(index + 1).trim();
+  }
+}
+const args = parseArgs(process.argv.slice(2));
+args.url = args.url || process.env.X_LIVE_URL || "";
+args.user = String(args.user || process.env.X_LIVE_USER || "").trim().replace(/^@/, "");
+args.label = args.label || process.env.X_LIVE_LABEL || "";
+args.color = args.color || process.env.X_LIVE_COLOR || "";
+args.token = args.token || process.env.X_LIVE_TOKEN || "";
+
+if (!args.url && !args.user) {
+  console.error("Missing --user <X handle> or --url <broadcast URL> (or X_LIVE_USER in .env)");
   process.exit(1);
 }
 
-const ingestBase = (args.ingest || process.env.PUBLIC_BASE_URL || "http://127.0.0.1:8787").replace(/\/+$/, "");
+const ingestBase = (args.ingest || process.env.X_LIVE_INGEST || process.env.PUBLIC_BASE_URL || "http://127.0.0.1:8787").replace(/\/+$/, "");
 const profileDir = path.join(root, ".local", "x-chat-profile");
 mkdirSync(profileDir, { recursive: true });
 
@@ -35,7 +58,7 @@ const seen = new Set();
 let relayed = 0;
 
 console.log(`X live chat bridge`);
-console.log(`  broadcast: ${args.url}`);
+console.log(`  target:    ${args.url || `@${args.user} (waiting for live broadcast)`}`);
 console.log(`  ingest:    ${ingestBase}/api/ingest`);
 if (args.label) console.log(`  tag:       ${args.label} ${args.color || ""}`);
 
@@ -61,8 +84,10 @@ await page.exposeFunction("uscEmitChat", (message) => {
   }
 });
 
-await page.goto(args.url, { waitUntil: "domcontentloaded" });
-console.log("Page open. If X asks you to log in, do it in this window; chat capture starts automatically.");
+const broadcastUrl = args.url || (await findBroadcastUrl(page, args.user));
+await page.goto(broadcastUrl, { waitUntil: "domcontentloaded" });
+console.log(`Attached to ${broadcastUrl}`);
+console.log("If X asks you to log in, do it in this window; chat capture starts automatically.");
 
 await installDomObserver(page);
 setInterval(() => installDomObserver(page).catch(() => {}), 15000);
@@ -72,6 +97,23 @@ process.on("SIGINT", async () => {
   await context.close().catch(() => {});
   process.exit(0);
 });
+
+async function findBroadcastUrl(page, user) {
+  console.log(`Watching x.com/${user} for a live broadcast (Ctrl+C to stop)...`);
+  for (;;) {
+    try {
+      await page.goto(`https://x.com/${user}`, { waitUntil: "domcontentloaded" });
+      await page.waitForTimeout(6000);
+      const href = await page.evaluate(() => {
+        const link = document.querySelector('a[href*="/i/broadcasts/"]');
+        return link ? link.href : "";
+      });
+      if (href) return href;
+    } catch {}
+    console.log(`@${user} is not live yet; checking again in 30s.`);
+    await page.waitForTimeout(30000);
+  }
+}
 
 function handlePayload(payload) {
   if (!payload.includes("{")) return;

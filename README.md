@@ -22,10 +22,12 @@ Vertical side rail for broadcast layouts that already use a lower third:
 
 ## Features
 
-- Twitch chat through the official IRC WebSocket.
+- Chat watchers: add a streamer by name + channels and aggregate their public chats — no login or OAuth from the streamer, with per-platform on/off toggles.
+- Twitch chat through the official IRC WebSocket (multi-channel).
 - X posts through official X API v2 recent search with one-click sync or 25-second auto-polling.
-- Kick chat through official `chat.message.sent` webhook events.
-- One normalized live feed with source labels.
+- X live-broadcast chat via an optional local browser bridge (`npm run x-live`) — X has no API for it.
+- Kick chat through official `chat.message.sent` webhook events, auto-subscribed per watched channel.
+- One normalized live feed with source labels and per-host colored identity tags.
 - Transparent `/overlay` page for OBS browser sources.
 - Multiple overlay shapes: full-width lower third, vertical side rail, and compact corner box.
 - Server-sent events for low-latency dashboard/overlay updates, with polling fallback.
