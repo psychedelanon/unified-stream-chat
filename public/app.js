@@ -4,6 +4,7 @@ const app = document.getElementById("app");
 const localMessageKey = "unifiedStreamChat.messages";
 const overlayOptions = readOverlayOptions();
 const identityRules = readIdentityRules();
+const roomName = cleanSlug(params.get("room") || localStorage.getItem("unifiedStreamChat.room") || "marketbubble") || "marketbubble";
 
 document.body.classList.toggle("is-overlay", isOverlay);
 document.body.dataset.overlayLayout = overlayOptions.layout;
@@ -23,6 +24,10 @@ const els = {
   countTwitch: document.getElementById("countTwitch"),
   countX: document.getElementById("countX"),
   countKick: document.getElementById("countKick"),
+  roomName: document.getElementById("roomName"),
+  hostList: document.getElementById("hostList"),
+  newHostName: document.getElementById("newHostName"),
+  newHostColor: document.getElementById("newHostColor"),
   twitchChannel: document.getElementById("twitchChannel"),
   xQuery: document.getElementById("xQuery"),
   kickWebhook: document.getElementById("kickWebhook"),
@@ -57,6 +62,10 @@ const state = {
   xTimer: null,
   xSyncInFlight: false,
   xNewestId: localStorage.getItem("unifiedStreamChat.xNewestId") || "",
+  connections: [],
+  connectionRules: [],
+  localHosts: readLocalHosts(),
+  joinedTwitchChannels: [],
 };
 
 const origin = window.location.origin;
@@ -66,6 +75,7 @@ const defaults = {
   adminToken: localStorage.getItem("unifiedStreamChat.adminToken") || "",
 };
 
+setValue(els.roomName, roomName);
 setValue(els.twitchChannel, defaults.twitchChannel);
 setValue(els.xQuery, defaults.xQuery);
 setValue(els.adminToken, defaults.adminToken);
@@ -84,11 +94,26 @@ bindDashboard();
 connectEvents();
 refreshState();
 setInterval(refreshState, isOverlay ? 2000 : 3000);
+refreshConnections();
+setInterval(refreshConnections, isOverlay ? 30000 : 15000);
+handleAuthReturn();
 
 function bindDashboard() {
   if (isOverlay) return;
 
-  document.getElementById("connectTwitch")?.addEventListener("click", connectTwitch);
+  document.getElementById("connectTwitch")?.addEventListener("click", () => connectTwitch());
+  document.getElementById("addHost")?.addEventListener("click", addHost);
+  els.newHostName?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") addHost();
+  });
+  els.roomName?.addEventListener("change", () => {
+    localStorage.setItem("unifiedStreamChat.room", currentRoom());
+    state.localHosts = readLocalHosts(currentRoom());
+    refreshConnections();
+  });
+  els.xQuery?.addEventListener("change", () => {
+    localStorage.setItem("unifiedStreamChat.xQueryCustom", "1");
+  });
   document.getElementById("syncX")?.addEventListener("click", syncX);
   document.getElementById("autoX")?.addEventListener("click", toggleAutoX);
   document.getElementById("copyKickWebhook")?.addEventListener("click", copyKickWebhook);
@@ -256,9 +281,12 @@ function renderOverlayPlaceholder() {
   `;
 }
 
-async function connectTwitch() {
-  const channel = cleanChannel(els.twitchChannel.value || "bitcoinaqua");
-  if (!channel) return;
+async function connectTwitch(extraChannels = []) {
+  const channels = Array.from(new Set([
+    ...String(els.twitchChannel.value || "").split(",").map(cleanChannel),
+    ...extraChannels.map(cleanChannel),
+  ].filter(Boolean)));
+  if (!channels.length) return;
   persistInputs();
 
   if (state.twitchSocket) {
@@ -270,13 +298,14 @@ async function connectTwitch() {
   const nick = `justinfan${Math.floor(Math.random() * 90000) + 10000}`;
   const socket = new WebSocket("wss://irc-ws.chat.twitch.tv:443");
   state.twitchSocket = socket;
+  state.joinedTwitchChannels = channels;
 
   socket.addEventListener("open", () => {
     socket.send("CAP REQ :twitch.tv/tags twitch.tv/commands");
     socket.send("PASS SCHMOOPIIE");
     socket.send(`NICK ${nick}`);
-    socket.send(`JOIN #${channel}`);
-    setSourceStatus("twitch", "live", channel);
+    socket.send(`JOIN ${channels.map((channel) => `#${channel}`).join(",")}`);
+    setSourceStatus("twitch", "live", channels.join(", "));
   });
 
   socket.addEventListener("message", (event) => {
@@ -286,7 +315,7 @@ async function connectTwitch() {
         socket.send(line.replace("PING", "PONG"));
         continue;
       }
-      const message = parseTwitchLine(line, channel);
+      const message = parseTwitchLine(line, channels[0]);
       if (message) ingestMessage(message);
     }
   });
@@ -296,6 +325,133 @@ async function connectTwitch() {
   });
 
   socket.addEventListener("error", () => setSourceStatus("twitch", "error", "error"));
+}
+
+async function refreshConnections() {
+  try {
+    const response = await fetch(`/api/connections?room=${encodeURIComponent(currentRoom())}`, { cache: "no-store" });
+    if (!response.ok) return;
+    const payload = await response.json();
+    state.connections = payload.hosts || [];
+    state.connectionRules = rulesFromConnections(state.connections);
+    if (!isOverlay) {
+      renderHosts();
+      autoWireSources();
+    }
+  } catch {}
+}
+
+function rulesFromConnections(hosts) {
+  return hosts.map((host) => {
+    const terms = new Set();
+    for (const connection of Object.values(host.connections || {})) {
+      for (const term of [connection.username, connection.channel]) {
+        const cleaned = String(term || "").trim().replace(/^[@#]/, "").toLowerCase();
+        if (cleaned) terms.add(cleaned);
+      }
+    }
+    return terms.size ? { label: host.label, color: cleanColor(host.color), terms: Array.from(terms) } : null;
+  }).filter(Boolean);
+}
+
+function renderHosts() {
+  if (!els.hostList) return;
+  const serverProfiles = new Set(state.connections.map((host) => host.profile));
+  const pending = state.localHosts.filter((host) => !serverProfiles.has(host.profile));
+  const hosts = [...state.connections, ...pending];
+  els.hostList.innerHTML = hosts.length
+    ? hosts.map(renderHostRow).join("")
+    : `<p class="note">No hosts yet. Add one below, then connect their accounts.</p>`;
+}
+
+function renderHostRow(host) {
+  const chips = ["x", "twitch", "kick"].map((platform) => {
+    const connection = host.connections?.[platform];
+    if (connection) {
+      const handle = connection.username || connection.channel || "connected";
+      return `<span class="connect-chip connected ${platform}" title="${escapeAttr(`${labelFor(platform)}: ${handle}`)}">${escapeHtml(labelFor(platform))} &check;</span>`;
+    }
+    const href = `/api/auth/${platform}/start?room=${encodeURIComponent(currentRoom())}&profile=${encodeURIComponent(host.profile)}&label=${encodeURIComponent(host.label)}&color=${encodeURIComponent(host.color || "")}`;
+    return `<a class="connect-chip ${platform}" href="${escapeAttr(href)}">${escapeHtml(labelFor(platform))} +</a>`;
+  }).join("");
+  const dotStyle = host.color ? ` style="--identity-color: ${escapeAttr(host.color)}"` : "";
+  return `
+    <div class="host-row">
+      <span class="host-dot"${dotStyle}></span>
+      <strong class="host-name">${escapeHtml(host.label)}</strong>
+      <span class="host-chips">${chips}</span>
+    </div>
+  `;
+}
+
+function addHost() {
+  const name = String(els.newHostName?.value || "").trim().slice(0, 32);
+  const profile = cleanSlug(name);
+  if (!profile) return;
+  const color = cleanColor(els.newHostColor?.value || "") || "#f97316";
+  state.localHosts = [
+    ...state.localHosts.filter((host) => host.profile !== profile),
+    { profile, label: name, color, connections: {} },
+  ];
+  writeLocalHosts();
+  if (els.newHostName) els.newHostName.value = "";
+  renderHosts();
+}
+
+function autoWireSources() {
+  const twitchChannels = state.connections
+    .map((host) => cleanChannel(host.connections?.twitch?.channel || ""))
+    .filter(Boolean);
+  const missing = twitchChannels.filter((channel) => !state.joinedTwitchChannels.includes(channel));
+  if (missing.length) connectTwitch(twitchChannels);
+
+  const xHandles = state.connections
+    .map((host) => String(host.connections?.x?.username || "").trim())
+    .filter(Boolean);
+  if (xHandles.length && !localStorage.getItem("unifiedStreamChat.xQueryCustom")) {
+    const query = `(${xHandles.map((handle) => `to:${handle} OR @${handle}`).join(" OR ")}) -is:retweet`;
+    if (els.xQuery && els.xQuery.value !== query) setValue(els.xQuery, query);
+  }
+}
+
+function handleAuthReturn() {
+  if (isOverlay) return;
+  const connected = params.get("connected");
+  const authError = params.get("auth_error");
+  if (!connected && !authError) return;
+  if (connected) {
+    const [platform, profile] = connected.split(":");
+    setSourceStatus(platform, "live", `${profile} linked`);
+    setText(els.feedMeta, `${labelFor(platform)} connected for ${profile}`);
+  }
+  if (authError) showError(authError);
+  const url = new URL(window.location.href);
+  url.searchParams.delete("connected");
+  url.searchParams.delete("auth_error");
+  history.replaceState(null, "", url.toString());
+}
+
+function currentRoom() {
+  return cleanSlug(els.roomName?.value || "") || roomName;
+}
+
+function readLocalHosts(room = roomName) {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(`unifiedStreamChat.hosts.${room}`) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalHosts() {
+  try {
+    localStorage.setItem(`unifiedStreamChat.hosts.${currentRoom()}`, JSON.stringify(state.localHosts.slice(0, 12)));
+  } catch {}
+}
+
+function cleanSlug(value) {
+  return String(value || "").trim().toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 48);
 }
 
 async function syncX() {
@@ -558,9 +714,10 @@ function readIdentityRules() {
 }
 
 function applyIdentityRule(message) {
-  if (message.identityLabel || !identityRules.length) return message;
+  const rules = identityRules.concat(state?.connectionRules || []);
+  if (message.identityLabel || !rules.length) return message;
   const haystack = [message.author, message.displayName, message.channel, message.text].join(" ").toLowerCase();
-  const rule = identityRules.find((candidate) => candidate.terms.some((term) => haystack.includes(term)));
+  const rule = rules.find((candidate) => candidate.terms.some((term) => haystack.includes(term)));
   if (!rule) return message;
   return {
     ...message,

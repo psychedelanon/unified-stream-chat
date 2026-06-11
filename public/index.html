@@ -41,6 +41,24 @@
         <section class="workspace">
           <aside class="panel controls" aria-label="Source controls">
             <section class="panel-section">
+              <h2>Hosts</h2>
+              <label>
+                Room
+                <input id="roomName" name="roomName" autocomplete="off" spellcheck="false" placeholder="marketbubble" />
+              </label>
+              <div id="hostList" class="host-list"></div>
+              <label>
+                Add host
+                <input id="newHostName" name="newHostName" autocomplete="off" spellcheck="false" placeholder="Ansem" />
+              </label>
+              <div class="split-buttons host-add-row">
+                <input id="newHostColor" name="newHostColor" type="color" value="#f97316" aria-label="Host color" />
+                <button id="addHost" type="button">Add Host</button>
+              </div>
+              <p class="note">Each host connects their own accounts once. Their chats land in this room tagged with their color.</p>
+            </section>
+
+            <section class="panel-section">
               <h2>Connect</h2>
               <label>
                 Twitch channel

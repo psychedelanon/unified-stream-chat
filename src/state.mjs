@@ -67,6 +67,11 @@ export function publicConfig(env = process.env, maxMessages = DEFAULT_MAX_MESSAG
     writeAuth: Boolean(env.STREAM_CHAT_ADMIN_TOKEN),
     xEnabled: Boolean(env.X_BEARER_TOKEN),
     kickSignatureVerification: Boolean(env.KICK_PUBLIC_KEY),
+    connect: {
+      x: Boolean(env.X_CLIENT_ID && env.X_CLIENT_SECRET && env.AUTH_SESSION_SECRET),
+      twitch: Boolean(env.TWITCH_CLIENT_ID && env.TWITCH_CLIENT_SECRET && env.AUTH_SESSION_SECRET),
+      kick: Boolean(env.KICK_CLIENT_ID && env.KICK_CLIENT_SECRET && env.AUTH_SESSION_SECRET),
+    },
     sources: [
       {
         id: "twitch",

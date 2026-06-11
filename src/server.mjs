@@ -11,6 +11,12 @@ import {
   normalizeKickWebhook,
   verifyKickSignature,
 } from "./state.mjs";
+import {
+  connectionsStore,
+  handleCallback,
+  stampIdentities,
+  startAuth,
+} from "./auth.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 loadEnv(root);
@@ -76,6 +82,18 @@ const server = createServer(async (request, response) => {
       return await kickWebhook(request, response);
     }
 
+    if (request.method === "GET" && /^\/api\/auth\/[a-z]+\/(start|callback)$/.test(url.pathname)) {
+      return await auth(request, response, url);
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/connections") {
+      return json(response, await connectionsStore(process.env).publicRoom(url.searchParams.get("room") || ""));
+    }
+
+    if (request.method === "DELETE" && url.pathname === "/api/connections") {
+      return await disconnect(request, response, url);
+    }
+
     return asset(request, response, url.pathname);
   } catch (error) {
     return json(response, { ok: false, error: error?.message || "server error" }, error.status || 500);
@@ -95,7 +113,9 @@ async function ingest(request, response) {
     return json(response, { ok: false, error: "unauthorized" }, 401);
   }
   const body = await readJson(request);
-  const state = await store.add(body.messages || body.message || body, { source: body.source });
+  const raw = body.messages || body.message || body;
+  const stamped = await stampIdentities(Array.isArray(raw) ? raw : [raw], process.env);
+  const state = await store.add(stamped, { source: body.source });
   broadcast({ type: "state", state });
   return json(response, { ok: true, state });
 }
@@ -115,9 +135,52 @@ async function xRecent(request, response, url) {
     sinceId: url.searchParams.get("since_id"),
     maxResults: url.searchParams.get("max_results"),
   }, process.env);
+  result.messages = await stampIdentities(result.messages, process.env);
   const state = url.searchParams.get("sync") === "0" ? null : await store.add(result.messages, { source: "x" });
   if (state) broadcast({ type: "state", state });
   return json(response, { ...result, state });
+}
+
+async function auth(request, response, url) {
+  const [, , , platform, action] = url.pathname.split("/");
+  try {
+    if (action === "start") {
+      const started = startAuth(platform, {
+        room: url.searchParams.get("room"),
+        profile: url.searchParams.get("profile"),
+        label: url.searchParams.get("label"),
+        color: url.searchParams.get("color"),
+      }, process.env);
+      return redirect(response, started.location, started.cookie);
+    }
+    const result = await handleCallback(platform, {
+      code: url.searchParams.get("code"),
+      state: url.searchParams.get("state"),
+      error: url.searchParams.get("error"),
+    }, String(request.headers.cookie || ""), process.env);
+    return redirect(response, result.location, result.clearCookie);
+  } catch (error) {
+    return redirect(response, `/?auth_error=${encodeURIComponent(error?.message || "auth failed")}`);
+  }
+}
+
+async function disconnect(request, response, url) {
+  if (!isAuthorized(request.headers, process.env)) {
+    return json(response, { ok: false, error: "unauthorized" }, 401);
+  }
+  const removed = await connectionsStore(process.env).removeConnection(
+    url.searchParams.get("room") || "default",
+    url.searchParams.get("profile") || "",
+    url.searchParams.get("platform") || "",
+  );
+  return json(response, { ok: true, removed });
+}
+
+function redirect(response, location, cookie) {
+  const headers = { location, "cache-control": "no-store", ...corsHeaders() };
+  if (cookie) headers["set-cookie"] = cookie;
+  response.writeHead(302, headers);
+  response.end();
 }
 
 async function kickWebhook(request, response) {
@@ -126,7 +189,7 @@ async function kickWebhook(request, response) {
     return json(response, { ok: false, error: "invalid Kick signature" }, 401);
   }
   const body = rawBody.trim() ? JSON.parse(rawBody) : {};
-  const messages = normalizeKickWebhook(body, request.headers);
+  const messages = await stampIdentities(normalizeKickWebhook(body, request.headers), process.env);
   if (!messages.length) return json(response, { ok: true, accepted: 0 }, 202);
 
   const state = await store.add(messages, { source: "kick" });

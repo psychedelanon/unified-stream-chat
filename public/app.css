@@ -392,6 +392,75 @@ h1 {
   overflow-wrap: anywhere;
 }
 
+.host-list {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 4px;
+}
+
+.host-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 7px 8px;
+  border: 1px solid rgba(245, 240, 223, 0.14);
+  border-radius: 8px;
+  background: rgba(245, 240, 223, 0.04);
+}
+
+.host-dot {
+  --identity-color: var(--accent);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--identity-color);
+  flex-shrink: 0;
+}
+
+.host-name {
+  font-size: 13px;
+  margin-right: auto;
+}
+
+.host-chips {
+  display: inline-flex;
+  gap: 5px;
+}
+
+.connect-chip {
+  display: inline-grid;
+  place-items: center;
+  min-height: 20px;
+  padding: 0 7px;
+  border: 1px solid rgba(245, 240, 223, 0.25);
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: #f5f0df;
+  cursor: pointer;
+}
+
+.connect-chip:hover {
+  border-color: rgba(245, 240, 223, 0.6);
+}
+
+.connect-chip.connected {
+  cursor: default;
+  border-color: rgba(110, 231, 183, 0.5);
+  color: #6ee7b7;
+}
+
+.host-add-row input[type="color"] {
+  padding: 2px;
+  min-width: 44px;
+  height: 34px;
+  cursor: pointer;
+}
+
 .identity-tag,
 .overlay-identity-tag {
   --identity-color: var(--accent);

@@ -5,6 +5,12 @@ import {
   normalizeKickWebhook,
   verifyKickSignature,
 } from "../src/state.mjs";
+import {
+  connectionsStore,
+  handleCallback,
+  stampIdentities,
+  startAuth,
+} from "../src/auth.mjs";
 
 export const config = {
   api: {
@@ -62,6 +68,18 @@ export default async function handler(request, response) {
       return await kickWebhook(request, response);
     }
 
+    if (request.method === "GET" && /^\/auth\/[a-z]+\/(start|callback)$/.test(route)) {
+      return await auth(request, response, route);
+    }
+
+    if (request.method === "GET" && route === "/connections") {
+      return json(response, await connectionsStore(process.env).publicRoom(queryValue(request.query.room)));
+    }
+
+    if (request.method === "DELETE" && route === "/connections") {
+      return await disconnect(request, response);
+    }
+
     return json(response, { ok: false, error: "not found" }, 404);
   } catch (error) {
     return json(response, { ok: false, error: error?.message || "server error" }, error.status || 500);
@@ -73,7 +91,9 @@ async function ingest(request, response) {
     return json(response, { ok: false, error: "unauthorized" }, 401);
   }
   const body = await readJson(request);
-  const state = await store.add(body.messages || body.message || body, { source: body.source });
+  const raw = body.messages || body.message || body;
+  const stamped = await stampIdentities(Array.isArray(raw) ? raw : [raw], process.env);
+  const state = await store.add(stamped, { source: body.source });
   return json(response, { ok: true, state });
 }
 
@@ -91,8 +111,44 @@ async function xRecent(request, response) {
     sinceId: queryValue(request.query.since_id),
     maxResults: queryValue(request.query.max_results),
   }, process.env);
+  result.messages = await stampIdentities(result.messages, process.env);
   const state = queryValue(request.query.sync) === "0" ? null : await store.add(result.messages, { source: "x" });
   return json(response, { ...result, state });
+}
+
+async function auth(request, response, route) {
+  const [, , platform, action] = route.split("/");
+  try {
+    if (action === "start") {
+      const started = startAuth(platform, {
+        room: queryValue(request.query.room),
+        profile: queryValue(request.query.profile),
+        label: queryValue(request.query.label),
+        color: queryValue(request.query.color),
+      }, process.env);
+      return redirect(response, started.location, started.cookie);
+    }
+    const result = await handleCallback(platform, {
+      code: queryValue(request.query.code),
+      state: queryValue(request.query.state),
+      error: queryValue(request.query.error),
+    }, String(request.headers.cookie || ""), process.env);
+    return redirect(response, result.location, result.clearCookie);
+  } catch (error) {
+    return redirect(response, `/?auth_error=${encodeURIComponent(error?.message || "auth failed")}`);
+  }
+}
+
+async function disconnect(request, response) {
+  if (!isAuthorized(request.headers, process.env)) {
+    return json(response, { ok: false, error: "unauthorized" }, 401);
+  }
+  const removed = await connectionsStore(process.env).removeConnection(
+    queryValue(request.query.room) || "default",
+    queryValue(request.query.profile),
+    queryValue(request.query.platform),
+  );
+  return json(response, { ok: true, removed });
 }
 
 async function kickWebhook(request, response) {
@@ -101,11 +157,18 @@ async function kickWebhook(request, response) {
     return json(response, { ok: false, error: "invalid Kick signature" }, 401);
   }
   const body = rawBody.trim() ? JSON.parse(rawBody) : {};
-  const messages = normalizeKickWebhook(body, request.headers);
+  const messages = await stampIdentities(normalizeKickWebhook(body, request.headers), process.env);
   if (!messages.length) return json(response, { ok: true, accepted: 0 }, 202);
 
   const state = await store.add(messages, { source: "kick" });
   return json(response, { ok: true, accepted: messages.length, state });
+}
+
+function redirect(response, location, cookie) {
+  const headers = { location, "cache-control": "no-store", ...corsHeaders() };
+  if (cookie) headers["set-cookie"] = cookie;
+  response.writeHead(302, headers);
+  response.end();
 }
 
 function sse(response, state) {
