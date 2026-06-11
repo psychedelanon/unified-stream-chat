@@ -8,7 +8,9 @@ import {
 import {
   addWatcherHost,
   connectionsStore,
+  dropDisabledMessages,
   handleCallback,
+  setWatcherEnabled,
   stampIdentities,
   startAuth,
 } from "../src/auth.mjs";
@@ -82,6 +84,13 @@ export default async function handler(request, response) {
         return json(response, { ok: false, error: "unauthorized" }, 401);
       }
       return json(response, await addWatcherHost(await readJson(request), process.env));
+    }
+
+    if (request.method === "POST" && route === "/hosts/toggle") {
+      if (!isAuthorized(request.headers, process.env)) {
+        return json(response, { ok: false, error: "unauthorized" }, 401);
+      }
+      return json(response, await setWatcherEnabled(await readJson(request), process.env));
     }
 
     if (request.method === "DELETE" && route === "/connections") {
@@ -165,7 +174,8 @@ async function kickWebhook(request, response) {
     return json(response, { ok: false, error: "invalid Kick signature" }, 401);
   }
   const body = rawBody.trim() ? JSON.parse(rawBody) : {};
-  const messages = await stampIdentities(normalizeKickWebhook(body, request.headers), process.env);
+  const incoming = await dropDisabledMessages(normalizeKickWebhook(body, request.headers), process.env);
+  const messages = await stampIdentities(incoming, process.env);
   if (!messages.length) return json(response, { ok: true, accepted: 0 }, 202);
 
   const state = await store.add(messages, { source: "kick" });

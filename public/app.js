@@ -106,6 +106,7 @@ function bindDashboard() {
 
   document.getElementById("connectTwitch")?.addEventListener("click", () => connectTwitch());
   document.getElementById("addHost")?.addEventListener("click", addHost);
+  els.hostList?.addEventListener("click", onWatcherChipClick);
   els.newHostName?.addEventListener("keydown", (event) => {
     if (event.key === "Enter") addHost();
   });
@@ -348,6 +349,7 @@ function rulesFromConnections(hosts) {
   return hosts.map((host) => {
     const terms = new Set();
     for (const connection of Object.values(host.connections || {})) {
+      if (connection.enabled === false) continue;
       for (const term of [connection.username, connection.channel]) {
         const cleaned = String(term || "").trim().replace(/^[@#]/, "").toLowerCase();
         if (cleaned) terms.add(cleaned);
@@ -364,20 +366,19 @@ function renderHosts() {
   const hosts = [...state.connections, ...pending];
   els.hostList.innerHTML = hosts.length
     ? hosts.map(renderHostRow).join("")
-    : `<p class="note">No hosts yet. Add one below, then connect their accounts.</p>`;
+    : `<p class="note">No watchers yet. Add a streamer below with the channels to watch.</p>`;
 }
 
 function renderHostRow(host) {
   const chips = ["x", "twitch", "kick"].map((platform) => {
     const connection = host.connections?.[platform];
     if (connection) {
-      const handle = connection.username || connection.channel || "connected";
-      const isWatch = connection.mode === "watch";
-      const title = `${labelFor(platform)}: ${isWatch ? "watching " : ""}${handle}`;
-      return `<span class="connect-chip connected${isWatch ? " watch" : ""} ${platform}" title="${escapeAttr(title)}">${escapeHtml(labelFor(platform))} ${isWatch ? "&#9678;" : "&check;"}</span>`;
+      const enabled = connection.enabled !== false;
+      const handle = connection.username || connection.channel || "";
+      const title = `${labelFor(platform)} ${handle}: click to turn ${enabled ? "off" : "on"}`;
+      return `<button type="button" class="connect-chip toggle ${platform}${enabled ? " on" : " off"}" data-toggle="${platform}" data-profile="${escapeAttr(host.profile)}" data-enabled="${enabled ? "1" : "0"}" title="${escapeAttr(title)}">${escapeHtml(labelFor(platform))}</button>`;
     }
-    const href = `/api/auth/${platform}/start?room=${encodeURIComponent(currentRoom())}&profile=${encodeURIComponent(host.profile)}&label=${encodeURIComponent(host.label)}&color=${encodeURIComponent(host.color || "")}`;
-    return `<a class="connect-chip ${platform}" href="${escapeAttr(href)}">${escapeHtml(labelFor(platform))} +</a>`;
+    return `<button type="button" class="connect-chip add ${platform}" data-add="${platform}" data-profile="${escapeAttr(host.profile)}" data-label="${escapeAttr(host.label)}" data-color="${escapeAttr(host.color || "")}" title="${escapeAttr(`Watch a ${labelFor(platform)} channel for ${host.label}`)}">${escapeHtml(labelFor(platform))} +</button>`;
   }).join("");
   const dotStyle = host.color ? ` style="--identity-color: ${escapeAttr(host.color)}"` : "";
   return `
@@ -387,6 +388,50 @@ function renderHostRow(host) {
       <span class="host-chips">${chips}</span>
     </div>
   `;
+}
+
+async function onWatcherChipClick(event) {
+  const target = event.target.closest("button[data-toggle], button[data-add]");
+  if (!target) return;
+  const profile = target.dataset.profile;
+  try {
+    if (target.dataset.toggle) {
+      target.disabled = true;
+      await postJson("/api/hosts/toggle", {
+        room: currentRoom(),
+        profile,
+        platform: target.dataset.toggle,
+        enabled: target.dataset.enabled !== "1",
+      });
+    } else {
+      const platform = target.dataset.add;
+      const kind = platform === "x" ? "handle" : "channel";
+      const handle = window.prompt(`${labelFor(platform)} ${kind} for ${target.dataset.label}:`);
+      if (!handle?.trim()) return;
+      await postJson("/api/hosts", {
+        room: currentRoom(),
+        profile,
+        label: target.dataset.label,
+        color: target.dataset.color,
+        [platform]: handle.trim(),
+      });
+    }
+    await refreshConnections();
+  } catch (error) {
+    showError(error.message || "Watcher update failed.");
+  } finally {
+    target.disabled = false;
+  }
+}
+
+async function postJson(path, body) {
+  const headers = { "content-type": "application/json" };
+  const token = els.adminToken?.value?.trim();
+  if (token) headers.authorization = `Bearer ${token}`;
+  const response = await fetch(path, { method: "POST", headers, body: JSON.stringify(body) });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload.ok === false) throw new Error(payload.error || `${path} returned ${response.status}`);
+  return payload;
 }
 
 async function addHost() {
@@ -440,12 +485,17 @@ async function addHost() {
 
 function autoWireSources() {
   const twitchChannels = state.connections
+    .filter((host) => host.connections?.twitch?.enabled !== false)
     .map((host) => cleanChannel(host.connections?.twitch?.channel || ""))
     .filter(Boolean);
-  const missing = twitchChannels.filter((channel) => !state.joinedTwitchChannels.includes(channel));
-  if (missing.length) connectTwitch(twitchChannels);
+  const previous = state.watcherTwitchChannels || [];
+  if (twitchChannels.join() !== previous.join() && (twitchChannels.length || previous.length)) {
+    state.watcherTwitchChannels = twitchChannels;
+    connectTwitch(twitchChannels);
+  }
 
   const xHandles = state.connections
+    .filter((host) => host.connections?.x?.enabled !== false)
     .map((host) => String(host.connections?.x?.username || "").trim())
     .filter(Boolean);
   if (xHandles.length && !localStorage.getItem("unifiedStreamChat.xQueryCustom")) {

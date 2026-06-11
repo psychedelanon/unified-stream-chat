@@ -180,6 +180,35 @@ export async function addWatcherHost(input = {}, env = process.env) {
   return { ok: true, room, profile, results };
 }
 
+export async function setWatcherEnabled(input = {}, env = process.env) {
+  const room = cleanSlug(input.room) || "default";
+  const profile = cleanSlug(input.profile);
+  const platform = String(input.platform || "").toLowerCase();
+  if (!profile || !PROVIDERS[platform]) throw httpError(400, "profile and platform are required");
+  const store = connectionsStore(env);
+  const doc = await store.read();
+  const connection = doc.rooms[room]?.hosts?.[profile]?.connections?.[platform];
+  if (!connection) throw httpError(404, "no such watcher connection");
+  connection.enabled = Boolean(input.enabled);
+  doc.rooms[room].updatedAt = new Date().toISOString();
+  await store.write(doc);
+  invalidateRulesCache();
+  return { ok: true, room, profile, platform, enabled: connection.enabled };
+}
+
+export async function dropDisabledMessages(messages, env = process.env) {
+  try {
+    await identityRules(env);
+    const disabled = new Set(rulesCache.disabledKick);
+    if (!disabled.size) return messages;
+    return messages.filter((message) => !(
+      message && message.source === "kick" && disabled.has(String(message.channel || "").toLowerCase())
+    ));
+  } catch {
+    return messages;
+  }
+}
+
 let kickTokenCache = { token: "", expiresAt: 0 };
 
 async function kickAppToken(env) {
@@ -345,16 +374,21 @@ export async function stampIdentities(messages, env = process.env) {
   }
 }
 
-let rulesCache = { at: 0, rules: [] };
+let rulesCache = { at: 0, rules: [], disabledKick: [] };
 
 async function identityRules(env) {
   if (Date.now() - rulesCache.at < RULES_CACHE_MS) return rulesCache.rules;
   const doc = await connectionsStore(env).read();
   const rules = [];
+  const disabledKick = [];
   for (const room of Object.values(doc.rooms || {})) {
     for (const host of Object.values(room.hosts || {})) {
       const terms = new Set();
-      for (const connection of Object.values(host.connections || {})) {
+      for (const [platform, connection] of Object.entries(host.connections || {})) {
+        if (connection.enabled === false) {
+          if (platform === "kick" && connection.channel) disabledKick.push(String(connection.channel).toLowerCase());
+          continue;
+        }
         for (const term of [connection.username, connection.channel]) {
           const cleaned = String(term || "").trim().replace(/^[@#]/, "").toLowerCase();
           if (cleaned) terms.add(cleaned);
@@ -363,12 +397,12 @@ async function identityRules(env) {
       if (terms.size) rules.push({ label: host.label, color: host.color || "", terms: Array.from(terms) });
     }
   }
-  rulesCache = { at: Date.now(), rules };
+  rulesCache = { at: Date.now(), rules, disabledKick };
   return rules;
 }
 
 function invalidateRulesCache() {
-  rulesCache = { at: 0, rules: [] };
+  rulesCache = { at: 0, rules: [], disabledKick: [] };
 }
 
 async function exchangeCode(provider, code, verifier, env) {
@@ -483,6 +517,7 @@ function publicConnection(connection = {}) {
   return {
     platform: connection.platform,
     mode: connection.mode || "oauth",
+    enabled: connection.enabled !== false,
     username: connection.username || "",
     displayName: connection.displayName || "",
     channel: connection.channel || "",

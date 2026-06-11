@@ -41,30 +41,30 @@
         <section class="workspace">
           <aside class="panel controls" aria-label="Source controls">
             <section class="panel-section">
-              <h2>Hosts</h2>
+              <h2>Chat Watchers</h2>
               <label>
                 Room
                 <input id="roomName" name="roomName" autocomplete="off" spellcheck="false" placeholder="marketbubble" />
               </label>
               <div id="hostList" class="host-list"></div>
               <label>
-                Add host
+                Add watcher
                 <input id="newHostName" name="newHostName" autocomplete="off" spellcheck="false" placeholder="Ansem" />
               </label>
               <div class="split-buttons three">
                 <input id="newHostX" name="newHostX" autocomplete="off" spellcheck="false" placeholder="@x" aria-label="X handle" />
                 <input id="newHostTwitch" name="newHostTwitch" autocomplete="off" spellcheck="false" placeholder="twitch" aria-label="Twitch channel" />
-                <input id="newHostKick" name="newHostKick" autocomplete="off" spellcheck="false" placeholder="kick" aria-label="Kick slug" />
+                <input id="newHostKick" name="newHostKick" autocomplete="off" spellcheck="false" placeholder="kick" aria-label="Kick channel" />
               </div>
               <div class="split-buttons host-add-row">
-                <input id="newHostColor" name="newHostColor" type="color" value="#f97316" aria-label="Host color" />
-                <button id="addHost" type="button">Add Host</button>
+                <input id="newHostColor" name="newHostColor" type="color" value="#f97316" aria-label="Watcher color" />
+                <button id="addHost" type="button">Add Watcher</button>
               </div>
-              <p class="note">Handles are optional: watchers pull public chats with no action from the host. Connect chips upgrade a host to a verified account.</p>
+              <p class="note">Watchers pull public chats from each platform; the streamer never logs in. Click a platform chip to toggle it on or off.</p>
             </section>
 
             <section class="panel-section">
-              <h2>Connect</h2>
+              <h2>Sources</h2>
               <label>
                 Twitch channel
                 <input id="twitchChannel" name="twitchChannel" autocomplete="off" spellcheck="false" placeholder="streamer" />

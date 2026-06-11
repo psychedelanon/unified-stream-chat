@@ -448,15 +448,25 @@ h1 {
   border-color: rgba(245, 240, 223, 0.6);
 }
 
-.connect-chip.connected {
-  cursor: default;
-  border-color: rgba(110, 231, 183, 0.5);
+.connect-chip {
+  background: none;
+  font-family: inherit;
+}
+
+.connect-chip.toggle.on {
+  border-color: rgba(110, 231, 183, 0.55);
   color: #6ee7b7;
 }
 
-.connect-chip.connected.watch {
-  border-color: rgba(252, 211, 77, 0.5);
-  color: #fcd34d;
+.connect-chip.toggle.off {
+  border-color: rgba(245, 240, 223, 0.18);
+  color: rgba(245, 240, 223, 0.4);
+  text-decoration: line-through;
+}
+
+.connect-chip.add {
+  border-style: dashed;
+  color: rgba(245, 240, 223, 0.55);
 }
 
 .host-add-row input[type="color"] {
