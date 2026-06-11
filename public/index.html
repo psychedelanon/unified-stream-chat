@@ -68,31 +68,8 @@
             </section>
 
             <section class="panel-section">
-              <h2>Sources</h2>
-              <label>
-                Twitch channel
-                <input id="twitchChannel" name="twitchChannel" autocomplete="off" spellcheck="false" placeholder="streamer" />
-              </label>
-              <button id="connectTwitch" type="button">Connect Twitch</button>
-
-              <label>
-                X query
-                <input id="xQuery" name="xQuery" autocomplete="off" spellcheck="false" placeholder="@streamer OR #hashtag" />
-              </label>
-              <div class="split-buttons">
-                <button id="syncX" type="button">Sync X</button>
-                <button id="autoX" type="button" aria-pressed="false">Auto X</button>
-              </div>
-
-              <label>
-                Kick webhook
-                <input id="kickWebhook" name="kickWebhook" readonly />
-              </label>
-              <button id="copyKickWebhook" type="button">Copy Webhook</button>
-            </section>
-
-            <section class="panel-section">
-              <h2>Demo</h2>
+              <h2>Try It</h2>
+              <p class="note">No setup needed: pulse fake messages through the feed and overlays.</p>
               <div class="split-buttons">
                 <button id="demoPulse" type="button" aria-pressed="false">Demo Pulse</button>
                 <button id="demoAll" type="button">Seed All</button>
@@ -104,6 +81,30 @@
               </div>
               <button id="clearFeed" class="danger" type="button">Clear Feed</button>
             </section>
+
+            <details class="panel-section advanced">
+              <summary>Advanced</summary>
+              <label>
+                Twitch channel (manual)
+                <input id="twitchChannel" name="twitchChannel" autocomplete="off" spellcheck="false" placeholder="streamer" />
+              </label>
+              <button id="connectTwitch" type="button">Connect Twitch</button>
+
+              <label>
+                X search query
+                <input id="xQuery" name="xQuery" autocomplete="off" spellcheck="false" placeholder="@streamer OR #hashtag" />
+              </label>
+              <div class="split-buttons">
+                <button id="syncX" type="button">Sync X</button>
+                <button id="autoX" type="button" aria-pressed="false">Auto X</button>
+              </div>
+
+              <label>
+                Kick webhook URL
+                <input id="kickWebhook" name="kickWebhook" readonly />
+              </label>
+              <button id="copyKickWebhook" type="button">Copy Webhook</button>
+            </details>
           </aside>
 
           <section class="panel feed-panel" aria-label="Unified live feed">
@@ -132,7 +133,7 @@
             </div>
             <div id="emptyState" class="state-block empty" hidden>
               <strong>No messages yet</strong>
-              <span>Connect a source, configure Kick webhooks, or seed a demo.</span>
+              <span>Add a chat watcher on the left, or press Demo Pulse to see the feed in action.</span>
             </div>
             <ol id="feedList" class="feed-list" aria-live="polite"></ol>
           </section>

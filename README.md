@@ -61,6 +61,24 @@ Run a setup check at any time:
 npm run doctor
 ```
 
+## Chat Watchers
+
+The core flow. Add a streamer under **Chat Watchers** — name, color, and
+any of their channels (X handle, Twitch channel, Kick channel) — and their
+public chats merge into the feed tagged with their color. The streamer never
+logs in or connects anything:
+
+- **Kick**: the server subscribes to `chat.message.sent` webhooks for the
+  channel using app-token credentials. Fully automatic from then on.
+- **Twitch**: the dashboard joins the channel over Twitch's official IRC
+  WebSocket (all watched channels share one socket).
+- **X**: replies and mentions of the handle start polling automatically via
+  the official v2 recent-search API.
+
+Each watcher row shows X / Twitch / Kick toggle chips; muting a platform is
+enforced server-side. Multiple watchers make this a multi-host show tool:
+every message carries both a platform label and a colored host tag.
+
 ## OBS Setup
 
 1. Add a Browser Source.
@@ -86,6 +104,8 @@ X_BEARER_TOKEN=optional-x-api-bearer-token
 UPSTASH_REDIS_REST_URL=optional-upstash-url
 UPSTASH_REDIS_REST_TOKEN=optional-upstash-token
 KICK_PUBLIC_KEY=optional-kick-public-key
+KICK_CLIENT_ID=optional-enables-kick-watcher-auto-subscribe
+KICK_CLIENT_SECRET=optional-enables-kick-watcher-auto-subscribe
 ```
 
 Run with Node:
@@ -114,6 +134,17 @@ Then set the Kick app webhook URL to:
 https://your-tunnel.trycloudflare.com/api/kick/webhook
 ```
 
+## X Live Chat Bridge (optional)
+
+X exposes no API for the chat inside a live broadcast. For shows that want
+it anyway, `npm run x-live` runs a set-and-forget bridge on one PC: it opens
+a real browser, watches the configured X account, attaches to each broadcast
+as it goes live, and relays chat into the feed with the host's tag. Configure
+it in `.local/x-live.config` (see `.env.example` for the `X_LIVE_*` keys),
+log into X once in the window it opens, and optionally drop a shortcut to
+`scripts\x-live-forever.bat` into `shell:startup` so it survives reboots and
+crashes. This is a power feature — the normal flow above never needs it.
+
 ## API
 
 ```text
@@ -121,6 +152,10 @@ GET    /health
 GET    /api/config
 GET    /api/messages
 GET    /api/events
+GET    /api/connections?room=...
+POST   /api/hosts
+POST   /api/hosts/toggle
+DELETE /api/connections?room=&profile=&platform=
 POST   /api/ingest
 POST   /api/messages
 DELETE /api/messages

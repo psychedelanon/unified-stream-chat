@@ -392,6 +392,20 @@ h1 {
   overflow-wrap: anywhere;
 }
 
+details.advanced summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 4px;
+}
+
+details.advanced[open] summary {
+  margin-bottom: 10px;
+}
+
 .host-list {
   display: grid;
   gap: 7px;

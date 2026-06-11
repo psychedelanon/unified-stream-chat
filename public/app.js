@@ -71,6 +71,8 @@ const state = {
   connectionRules: [],
   localHosts: readLocalHosts(),
   joinedTwitchChannels: [],
+  serverConfig: null,
+  xAutoStarted: false,
 };
 
 const origin = window.location.origin;
@@ -179,6 +181,7 @@ async function refreshState() {
     const response = await fetch("/api/messages", { cache: "no-store" });
     if (!response.ok) throw new Error(`messages returned ${response.status}`);
     const payload = await response.json();
+    if (payload.config) state.serverConfig = payload.config;
     mergeMessages(payload.messages || []);
     updateStats();
     state.loaded = true;
@@ -503,6 +506,12 @@ function autoWireSources() {
     const query = `(${xHandles.map((handle) => `to:${handle} OR @${handle}`).join(" OR ")}) -is:retweet`;
     if (els.xQuery && els.xQuery.value !== query) setValue(els.xQuery, query);
   }
+
+  // X polling starts itself once a watched handle exists; no clicks needed.
+  if (xHandles.length && state.serverConfig?.xEnabled && !state.xTimer && !state.xAutoStarted) {
+    state.xAutoStarted = true;
+    toggleAutoX();
+  }
 }
 
 function handleAuthReturn() {
@@ -684,6 +693,13 @@ async function clearFeed() {
     const token = els.adminToken?.value?.trim();
     if (token) headers.authorization = `Bearer ${token}`;
     const response = await fetch("/api/messages", { method: "DELETE", headers });
+    if (response.status === 401) {
+      state.messages = [];
+      updateStats();
+      render();
+      showError("Cleared locally. Enter the admin token to clear the shared feed.");
+      return;
+    }
     if (!response.ok) throw new Error(`clear returned ${response.status}`);
     state.messages = [];
     updateStats();

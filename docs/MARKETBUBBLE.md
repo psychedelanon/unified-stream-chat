@@ -35,22 +35,10 @@ platform on or off (dim + struck-through = off).
 - **Twitch**: keep one dashboard tab open anywhere — that tab relays Twitch
   chat for all watched channels. (A laptop running OBS with the dashboard
   open in a browser tab is enough.)
-- **X mentions**: click **Auto X** once. It pulls posts that reply to or
-  mention your hosts every 25 seconds. Note: X does not allow any app to
-  read the chat inside an X live broadcast through its API — mentions and
-  replies are all X offers officially.
-- **X live chat** (optional, runs on the operator's PC): the repo includes a
-  bridge that opens the live broadcast in a real browser and relays its chat
-  into the feed. It is set-and-forget: start it once and leave it running
-  minimized — it watches the show's X account, attaches automatically every
-  time a broadcast starts, and goes back to waiting when it ends. Nothing to
-  do on show day.
-  - Start manually: `npm run x-live`
-  - Start with Windows: put a shortcut to `scripts\x-live-forever.bat` in
-    `shell:startup` (Win+R, type `shell:startup`). It also auto-restarts the
-    bridge if it ever crashes.
-  - First run only: log into X in the window it opens; the session persists.
-  - The account it watches and the host tag live in `.local/x-live.config`.
+- **X**: automatic. Posts that reply to or mention your hosts are pulled
+  every 25 seconds while the dashboard is open. (X does not allow any app to
+  read the chat inside an X live broadcast — replies and mentions are what X
+  offers. Viewers replying to the stream announcement post all show up.)
 - The OBS overlay updates by itself. Add it as a Browser Source at
   1920x1080; pick lower-third, rail, or compact via the URLs in the
   dashboard's OBS panel.
@@ -67,9 +55,19 @@ platform on or off (dim + struck-through = off).
   channel name is the exact kick.com slug.
 - **No Twitch messages**: is a dashboard tab open? The Twitch status card
   should show the joined channel names.
-- **No X messages**: X only shows replies/mentions of the hosts, and only
-  while Auto X is on. Check the X query box contains the hosts' handles.
+- **No X messages**: X only shows replies/mentions of the hosts. Check that
+  a host has an X handle set (green X chip on their watcher row).
 - **"unauthorized" errors**: the Admin token field is empty or wrong.
+
+## Optional power feature: true X live chat
+
+X's live-broadcast chat is not available to any app through X's official
+APIs. For shows that want it anyway, the repo ships a bridge that runs on
+one PC, watches the show's X account in a real browser, and relays the live
+chat into the feed automatically. This is a technical setup (Node.js + a
+one-time X login) — it is not needed for the normal flow above. See the
+"X live chat bridge" section of the repo README if you want it; @bitcoinaqua
+can set it up for you.
 
 ## Support
 
