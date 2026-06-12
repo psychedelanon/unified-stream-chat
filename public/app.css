@@ -330,6 +330,16 @@ h1 {
   font-weight: 750;
 }
 
+.note.hint {
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--line-strong);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  line-height: 1.45;
+}
+
 .segmented {
   display: flex;
   gap: 6px;

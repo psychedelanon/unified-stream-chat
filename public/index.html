@@ -68,18 +68,19 @@
               <div id="hostList" class="host-list"></div>
               <label>
                 Add watcher
-                <input id="newHostName" name="newHostName" autocomplete="off" spellcheck="false" placeholder="Ansem" />
+                <input id="newHostName" name="newHostName" autocomplete="off" spellcheck="false" placeholder="Name (e.g. Ansem)" />
               </label>
+              <p class="note hint">Add their public handle / channel on the platforms they use, pick a color, then Add Watcher. Leave a field blank to skip that platform. No login — public channels only.</p>
               <div class="split-buttons three">
-                <input id="newHostX" name="newHostX" autocomplete="off" spellcheck="false" placeholder="@x" aria-label="X handle" />
-                <input id="newHostTwitch" name="newHostTwitch" autocomplete="off" spellcheck="false" placeholder="twitch" aria-label="Twitch channel" />
-                <input id="newHostKick" name="newHostKick" autocomplete="off" spellcheck="false" placeholder="kick" aria-label="Kick channel" />
+                <input id="newHostX" name="newHostX" autocomplete="off" spellcheck="false" placeholder="X @handle" aria-label="X handle" />
+                <input id="newHostTwitch" name="newHostTwitch" autocomplete="off" spellcheck="false" placeholder="Twitch" aria-label="Twitch channel" />
+                <input id="newHostKick" name="newHostKick" autocomplete="off" spellcheck="false" placeholder="Kick" aria-label="Kick channel" />
               </div>
               <div class="split-buttons host-add-row">
                 <input id="newHostColor" name="newHostColor" type="color" value="#f97316" aria-label="Watcher color" />
                 <button id="addHost" type="button">Add Watcher</button>
               </div>
-              <p class="note">Watchers pull public chats from each platform; the streamer never logs in. Click a platform chip to toggle it on or off.</p>
+              <p class="note">Each watcher row has X / Twitch / Kick chips — click one to toggle that platform on or off, or to add a channel later.</p>
             </section>
 
             <section class="panel-section">
