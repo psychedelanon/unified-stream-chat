@@ -26,7 +26,7 @@ Transparent OBS lower-third and vertical rail overlays are also included:
 
 - Chat watchers: add a streamer by name + channels and aggregate their public chats — no login or OAuth from the streamer, with per-platform on/off toggles.
 - Twitch chat through the official IRC WebSocket (multi-channel).
-- X posts through official X API v2 recent search with one-click sync or 25-second auto-polling.
+- X live-broadcast chat relayed by a local browser bridge (X exposes no API for it) — the in-stream chat, not mentions.
 - X live-broadcast chat via an optional local browser bridge (`npm run x-live`) — X has no API for it.
 - Kick chat through official `chat.message.sent` webhook events, auto-subscribed per watched channel.
 - One normalized live feed with source labels and per-host colored identity tags.
@@ -74,8 +74,10 @@ logs in or connects anything:
   channel using app-token credentials. Fully automatic from then on.
 - **Twitch**: the dashboard joins the channel over Twitch's official IRC
   WebSocket (all watched channels share one socket).
-- **X**: replies and mentions of the handle start polling automatically via
-  the official v2 recent-search API.
+- **X**: the in-stream live-broadcast chat, relayed by the bridge (see
+  below). X exposes no API for it, so a small helper runs on the streaming
+  PC and attaches to each broadcast automatically. The X handle on a watcher
+  is the bridge target and drives the host's color tag.
 
 Each watcher row shows X / Twitch / Kick toggle chips; muting a platform is
 enforced server-side. Multiple watchers make this a multi-host show tool:

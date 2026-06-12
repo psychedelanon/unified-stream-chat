@@ -36,10 +36,10 @@ platform on or off (dim + struck-through = off).
 - **Twitch**: keep one dashboard tab open anywhere — that tab relays Twitch
   chat for all watched channels. (A laptop running OBS with the dashboard
   open in a browser tab is enough.)
-- **X**: automatic. Posts that reply to or mention your hosts are pulled
-  every 25 seconds while the dashboard is open. (X does not allow any app to
-  read the chat inside an X live broadcast — replies and mentions are what X
-  offers. Viewers replying to the stream announcement post all show up.)
+- **X**: the in-stream live-broadcast chat, relayed by the bridge running on
+  the show PC (one-time setup below). It attaches to each broadcast on its
+  own — nothing to do during the show once it's running. We pull the actual
+  live chat, not mentions or replies.
 - The OBS overlay updates by itself. Add the **chat box** as a Browser
   Source (copy its URL from the dashboard's OBS Overlays panel, or use the
   link in the table above) and size it to your scene — it's a clean
@@ -58,30 +58,29 @@ platform on or off (dim + struck-through = off).
   channel name is the exact kick.com slug.
 - **No Twitch messages**: is a dashboard tab open? The Twitch status card
   should show the joined channel names.
-- **No X messages**: X only shows replies/mentions of the hosts. Check that
-  a host has an X handle set (green X chip on their watcher row).
+- **No X messages**: the X live-chat bridge must be running on the show PC
+  (see X Live Chat below) and the host must be live on X. Check the host has
+  an X handle set (green X chip on their watcher row).
 - **"unauthorized" errors**: the Admin token field is empty or wrong.
 
-## Optional power feature: true X live chat
+## X Live Chat setup (one-time, on the show PC)
 
 X's live-broadcast chat is not available to any app through X's official
-APIs. For shows that want it anyway, a small helper runs on one PC (the
-streaming/OBS machine is perfect) and relays the live chat into the feed
-automatically — it attaches itself every time the host goes live.
+APIs, so a small helper runs on one PC (the streaming/OBS machine is perfect)
+and relays the live chat into the feed automatically — it attaches itself
+every time a host goes live.
 
-Two things to know:
+**The hosts never log into anything.** The helper reads the public live chat,
+the same one every viewer sees. Its browser just needs to be signed into
+*some* X account because X blocks logged-out browsing — a burner or the
+show's utility account is perfect.
 
-- **The hosts never log into anything.** The helper reads the public live
-  chat, the same one every viewer sees. Its browser just needs to be signed
-  into *some* X account because X blocks logged-out browsing — a burner or
-  the show's utility account is perfect.
-- One-time on the show PC: run `npm run x-login` once, sign the browser
-  into any X account (a burner is perfect), close the window. That session
-  is saved permanently.
-- Then the exact run command is generated for you: open the dashboard's
-  **X Live Chat** panel (bottom-left) and press **Copy** next to the host.
-  Paste it into a terminal in the project folder and leave it running — it
-  attaches to each broadcast automatically and relays the live chat.
+1. On the show PC, in the project folder, run `npm run x-login` once, sign
+   the browser into any X account, and close the window. That session is
+   saved permanently.
+2. In the dashboard's **X Live Chat Setup** panel (left column), press
+   **Copy** next to each host. Paste the command into a terminal and leave it
+   running — it attaches to each broadcast automatically and relays the chat.
 
 @bitcoinaqua can set this up on the show PC in a few minutes if you'd
 rather not touch it.

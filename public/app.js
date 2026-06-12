@@ -50,7 +50,7 @@ const els = {
 
 const sourceStatus = {
   twitch: { state: "idle", text: "idle" },
-  x: { state: "idle", text: "idle" },
+  x: { state: "warn", text: "bridge" },
   kick: { state: "warn", text: "webhook" },
 };
 
@@ -64,16 +64,11 @@ const state = {
   eventSource: null,
   twitchSocket: null,
   demoTimer: null,
-  xTimer: null,
-  xSyncInFlight: false,
-  xNewestId: localStorage.getItem("unifiedStreamChat.xNewestId") || "",
   connections: [],
   connectionRules: [],
   localHosts: readLocalHosts(),
   joinedTwitchChannels: [],
   serverConfig: null,
-  xAutoStarted: false,
-  xQuery: "",
 };
 
 const origin = window.location.origin;
@@ -509,27 +504,8 @@ function autoWireSources() {
     connectTwitch(twitchChannels);
   }
 
-  const xHandles = state.connections
-    .filter((host) => host.connections?.x?.enabled !== false)
-    .map((host) => String(host.connections?.x?.username || "").trim())
-    .filter(Boolean);
-  state.xQuery = xHandles.length
-    ? `(${xHandles.map((handle) => `to:${handle} OR @${handle}`).join(" OR ")}) -is:retweet`
-    : "";
-
-  // X polling starts itself once a watched handle exists; no clicks needed.
-  if (xHandles.length && state.serverConfig?.xEnabled && !state.xTimer && !state.xAutoStarted) {
-    state.xAutoStarted = true;
-    syncX();
-    state.xTimer = setInterval(syncX, 25000);
-  }
-  if (!xHandles.length && state.xTimer) {
-    clearInterval(state.xTimer);
-    state.xTimer = null;
-    state.xAutoStarted = false;
-    setSourceStatus("x", "idle", "idle");
-  }
-
+  // X is live-broadcast chat only (via the bridge); we never poll mentions.
+  // The X handle drives the per-host bridge command and identity tagging.
   renderXLiveCommands();
 }
 
@@ -614,41 +590,6 @@ function writeLocalHosts() {
 
 function cleanSlug(value) {
   return String(value || "").trim().toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 48);
-}
-
-async function syncX() {
-  if (state.xSyncInFlight) return;
-  const query = state.xQuery.trim();
-  if (!query) return;
-  state.xSyncInFlight = true;
-  setSourceStatus("x", "warn", "syncing");
-
-  const url = new URL("/api/x/recent", origin);
-  url.searchParams.set("query", query);
-  url.searchParams.set("max_results", "20");
-  if (state.xNewestId) url.searchParams.set("since_id", state.xNewestId);
-
-  try {
-    const headers = {};
-    const token = els.adminToken?.value?.trim();
-    if (token) headers.authorization = `Bearer ${token}`;
-    const response = await fetch(url, { cache: "no-store", headers });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || `X returned ${response.status}`);
-    if (payload.meta?.newest_id) {
-      state.xNewestId = payload.meta.newest_id;
-      localStorage.setItem("unifiedStreamChat.xNewestId", state.xNewestId);
-    }
-    mergeMessages(payload.messages || []);
-    setSourceStatus("x", "live", `${payload.messages?.length || 0} new`);
-    updateStats();
-    render();
-  } catch (error) {
-    setSourceStatus("x", "error", "needs token");
-    showError(error.message || "X sync failed.");
-  } finally {
-    state.xSyncInFlight = false;
-  }
 }
 
 function toggleDemoPulse() {

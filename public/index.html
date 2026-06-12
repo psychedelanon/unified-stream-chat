@@ -44,7 +44,7 @@
           <div class="source-card x" id="status-x" data-state="idle">
             <span class="source-dot"></span>
             <strong>X</strong>
-            <em>idle</em>
+            <em>bridge</em>
           </div>
           <div class="source-card kick" id="status-kick" data-state="idle">
             <span class="source-dot"></span>
@@ -98,11 +98,15 @@
               <button id="clearFeed" class="danger" type="button">Clear Feed</button>
             </section>
 
-            <details class="panel-section advanced">
-              <summary>X Live Chat (power feature)</summary>
-              <p class="note">X has no API for live-broadcast chat, so a small helper runs on the streaming PC and relays it here. Sign its browser into <strong>any</strong> X account — a burner works; hosts never log in. One copy-paste per host, run from the project folder:</p>
+            <section class="panel-section">
+              <h2>X Live Chat Setup</h2>
+              <p class="note">X has no API for live-broadcast chat, so a small helper on the streaming PC relays it into the feed. Start it once and leave it — it attaches to each broadcast automatically.</p>
+              <ol class="steps">
+                <li>On the streaming PC, in the project folder, run <code>npm run x-login</code> once and sign into <strong>any</strong> X account (a burner works — it only reads public chat; the hosts never log in).</li>
+                <li>Copy each host's command below, run it in a terminal, and leave it running during the show.</li>
+              </ol>
               <div id="xLiveCommands"><p class="note">Add a watcher with an X handle to generate its command.</p></div>
-            </details>
+            </section>
           </aside>
 
           <section class="panel feed-panel" aria-label="Unified live feed">
