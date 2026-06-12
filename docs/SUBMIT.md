@@ -13,7 +13,7 @@ unified-stream-chat
 Push:
 
 ```powershell
-cd C:\Users\mgmay\Code\unified-stream-chat
+cd unified-stream-chat
 git remote add origin https://github.com/psychedelanon/unified-stream-chat.git
 git push -u origin main
 ```
@@ -27,7 +27,7 @@ Fastest production-friendly path: Render Blueprint using `render.yaml`.
 Fastest preview/demo path from this machine: Vercel.
 
 ```powershell
-cd C:\Users\mgmay\Code\unified-stream-chat
+cd unified-stream-chat
 vercel deploy . -y
 ```
 

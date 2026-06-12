@@ -243,7 +243,7 @@ The Sproto stream can consume this standalone app by setting:
 
 ```powershell
 $env:SPROTO_CHAT_OVERLAY_URL = "http://127.0.0.1:8787/overlay"
-cd C:\Users\mgmay\Code\bitcoinaqua-sproto-stream
+cd ../bitcoinaqua-sproto-stream
 node scripts\obs-layout-sproto-gameplay.mjs
 ```
 

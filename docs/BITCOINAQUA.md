@@ -5,7 +5,7 @@ Unified Stream Chat is standalone. BITCOINAQUA Sproto Stream consumes it as an O
 ## Run Standalone Chat
 
 ```powershell
-cd C:\Users\mgmay\Code\unified-stream-chat
+cd unified-stream-chat
 npm run dev
 npm run seed
 ```
@@ -32,7 +32,7 @@ http://127.0.0.1:8787/overlay?layout=rail&position=right&messages=5
 
 ```powershell
 $env:SPROTO_CHAT_OVERLAY_URL = "http://127.0.0.1:8787/overlay?layout=rail&position=right&messages=5"
-cd C:\Users\mgmay\Code\bitcoinaqua-sproto-stream
+cd ../bitcoinaqua-sproto-stream
 node scripts\obs-layout-sproto-gameplay.mjs
 ```
 

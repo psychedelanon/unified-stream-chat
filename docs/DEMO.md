@@ -5,7 +5,7 @@ Target length: 90 seconds.
 ## Preflight
 
 ```powershell
-cd C:\Users\mgmay\Code\unified-stream-chat
+cd unified-stream-chat
 npm run doctor
 npm run verify
 ```
